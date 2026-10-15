@@ -8,10 +8,8 @@
 // Ao montar, adota o job processing mais recente (a geração sobrevive a
 // reload/troca de página).
 //
-// Multiview: 4 slots posicionais (Frente obrigatória + Esquerda/Trás/Direita)
-// — o Tripo exige saber qual ângulo é qual; Rodin/Meshy recebem como lista.
-// Os 4 slots são O TRABALHO: ficam na superfície do painel. O que sobra —
-// motor e prompt de materiais — vive atrás de duas linhas de ajuste.
+// Uma foto é suficiente; até três ângulos adicionais aparecem por escolha do
+// usuário, sempre na ordem posicional exigida pelo H3.1.
 //
 // Progresso: os motores fal não reportam % — quando o job vem com progress 0,
 // a barra é sintetizada pela estimativa do motor (capada em 92%).
@@ -23,29 +21,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import {
-  RowIcon,
-  SettingGroup,
-  SettingRow,
-  Sheet,
-  ChoiceGroup,
-  summarize,
-  useAmbient,
-} from '@/components/app/glass'
+import { useAmbient } from '@/components/app/glass'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import { jsonOrNull, errMsg } from '@/lib/http/fetch-json'
 import { downloadBlob } from '@/lib/apresentar/svg-to-png'
 import {
   BLOCOS3D_ENGINES,
-  BLOCOS3D_QUALITY_ORDER,
   BLOCOS3D_SOURCE_MAX_BYTES,
   BLOCOS3D_SOURCE_MAX_MB,
   DEFAULT_BLOCOS3D_QUALITY,
-  TEXTURE_PROMPT_MAX_LEN,
   VIEW_POSITION_LABEL,
   VIEW_POSITION_ORDER,
 } from '@/lib/blocos3d/config'
-import type { Blocos3DJobView, Blocos3DQuality, ModelFormat, ViewPosition } from '@/lib/blocos3d/types'
+import type { Blocos3DJobView, ModelFormat, ViewPosition } from '@/lib/blocos3d/types'
 import { useObjectUrls } from '@/lib/browser/object-url'
 
 const GlbViewer = dynamic(() => import('./GlbViewer'), { ssr: false })
@@ -152,17 +140,14 @@ function ProcessingPanel({ job }: { job: Blocos3DJobView }) {
 
 type SlotFiles    = Partial<Record<ViewPosition, File>>
 type SlotPreviews = Partial<Record<ViewPosition, string>>
-type SheetId      = 'saida' | 'materiais'
-
 interface Blocos3DClientProps {
   initialCredits: number
-  /** Disponibilidade real por tier (server checa as keys dos providers). */
-  engineAvailability: Record<Blocos3DQuality, boolean>
+  engineAvailable: boolean
   /** Deep-link (?job=) vindo do Histórico — abre este job selecionado. */
   initialJobId?: string
 }
 
-export default function Blocos3DClient({ initialCredits, engineAvailability, initialJobId }: Blocos3DClientProps) {
+export default function Blocos3DClient({ initialCredits, engineAvailable, initialJobId }: Blocos3DClientProps) {
   // Entrada — multiview por posição
   const [slotFiles,    setSlotFiles]    = useState<SlotFiles>({})
   const [slotPreviews, setSlotPreviews] = useState<SlotPreviews>({})
@@ -170,14 +155,6 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
   // ao desmontar (uma object URL segura o arquivo em memória até alguém soltar).
   const objectUrls = useObjectUrls()
   const [dragSlot,     setDragSlot]     = useState<ViewPosition | null>(null)
-
-  // Opções
-  const [quality, setQuality] = useState<Blocos3DQuality>(
-    engineAvailability[DEFAULT_BLOCOS3D_QUALITY] ? DEFAULT_BLOCOS3D_QUALITY
-      : BLOCOS3D_QUALITY_ORDER.find(q => engineAvailability[q]) ?? DEFAULT_BLOCOS3D_QUALITY,
-  )
-  const [texturePrompt, setTexturePrompt] = useState('')
-  const [sheet,         setSheet]         = useState<SheetId | null>(null)
 
   // Job + histórico
   const [job,     setJob]     = useState<Blocos3DJobView | null>(null)
@@ -187,17 +164,17 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [credits,      setCredits]      = useState(initialCredits)
   const [error,        setError]        = useState<string | null>(null)
-  const [downloading,  setDownloading]  = useState<ModelFormat | null>(null)
+  const [downloading,  setDownloading]  = useState<ModelFormat | 'original' | null>(null)
 
   const fileInputRef  = useRef<HTMLInputElement>(null)
   const activeSlotRef = useRef<ViewPosition>('front')
   const pollRef       = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const engine   = BLOCOS3D_ENGINES[quality]
+  const engine   = BLOCOS3D_ENGINES[DEFAULT_BLOCOS3D_QUALITY]
   const nodeCost = engine.costInNodes
   const imageCount = VIEW_POSITION_ORDER.filter(p => slotFiles[p]).length
   const isGenerating = isSubmitting || job?.status === 'processing'
-  const canSubmit = !!slotFiles.front && credits >= nodeCost && !isGenerating && engineAvailability[quality]
+  const canSubmit = !!slotFiles.front && credits >= nodeCost && !isGenerating && engineAvailable
 
   // O papel de parede é o trabalho em foco: o bloco aberto, ou a foto da frente.
   useAmbient(job?.thumbnailUrl ?? job?.inputUrl ?? slotPreviews.front ?? null)
@@ -255,10 +232,10 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
         setJob(fresh)
         if (fresh.status !== 'processing') {
           refreshHistory()
-          if (fresh.status === 'failed') {
-            setError(fresh.errorMessage
-              ? `A geração falhou: ${fresh.errorMessage}. Os nodes foram estornados.`
-              : 'A geração falhou. Os nodes foram estornados.')
+          if (fresh.status === 'failed' && fresh.refunded) {
+            fetch('/api/users/me/balance').then(r => r.ok ? r.json() : null)
+              .then(data => { if (typeof data?.total_balance === 'number') setCredits(data.total_balance) })
+              .catch(() => {})
           }
         }
       } catch {
@@ -275,11 +252,13 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
   // ── Entrada de imagens ─────────────────────────────────────────────────────
 
   function loadImageFile(file: File, pos: ViewPosition) {
-    if (!file.type.startsWith('image/')) { setError('Arquivo deve ser uma imagem.'); return }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Envie uma foto JPG, PNG ou WebP.'); return
+    }
     if (file.size > BLOCOS3D_SOURCE_MAX_BYTES) { setError(`Imagem muito grande. Máximo ${BLOCOS3D_SOURCE_MAX_MB} MB.`); return }
     setError(null)
     setSlotFiles(cur => ({ ...cur, [pos]: file }))
-    // Object URL, não data URL: aqui são QUATRO slots de até 20 MB cada, e
+    // Object URL, não data URL: aqui são quatro slots de até 15 MB cada, e
     // o slot frontal ainda alimenta o papel de parede. Ver
     // lib/browser/object-url.ts.
     const url = objectUrls.create(file)
@@ -290,10 +269,16 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
   }
 
   function removeSlot(pos: ViewPosition) {
-    setSlotFiles(cur => { const next = { ...cur }; delete next[pos]; return next })
+    const after = VIEW_POSITION_ORDER.slice(VIEW_POSITION_ORDER.indexOf(pos))
+    setSlotFiles(cur => {
+      const next = { ...cur }
+      after.forEach(p => { delete next[p] })
+      return next
+    })
     setSlotPreviews(cur => {
-      objectUrls.revoke(cur[pos])
-      const next = { ...cur }; delete next[pos]; return next
+      const next = { ...cur }
+      after.forEach(p => { objectUrls.revoke(next[p]); delete next[p] })
+      return next
     })
   }
 
@@ -333,8 +318,6 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sourceKeys,
-          quality,
-          ...(texturePrompt.trim() && engine.supportsTexturePrompt ? { texturePrompt: texturePrompt.trim() } : {}),
         }),
       })
       const data = await jsonOrNull(res)
@@ -352,12 +335,14 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
         id:           data.jobId,
         status:       'processing',
         progress:     0,
-        quality,
+        quality:      DEFAULT_BLOCOS3D_QUALITY,
         inputUrl:     slotPreviews.front ?? null,
         thumbnailUrl: null,
         modelUrls:    {},
+        originalGlbUrl: null,
         nodesCost:    nodeCost,
         errorMessage: null,
+        refunded:     false,
         createdAt:    new Date().toISOString(),
         completedAt:  null,
       })
@@ -370,12 +355,12 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
 
   // ── Download ───────────────────────────────────────────────────────────────
 
-  async function handleDownload(format: ModelFormat) {
-    const url = job?.modelUrls[format]
+  async function handleDownload(format: ModelFormat | 'original') {
+    const url = format === 'original' ? job?.originalGlbUrl : job?.modelUrls[format]
     if (!url || downloading) return
     setDownloading(format)
     try {
-      const filename = `spacenode-bloco3d.${format}`
+      const filename = format === 'original' ? 'spacenode-bloco3d-original.glb' : `spacenode-bloco3d.${format}`
       if (url.includes('/storage/v1/object/sign/')) {
         // Signed URL do nosso Storage: o param download dispara o attachment
         // direto no browser — sem bufferizar dezenas de MB em memória.
@@ -511,23 +496,30 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
         </header>
 
         <div className="spn-tool-panel-body">
-          {/* Os ângulos são o trabalho: ficam na superfície, e sem a frente o
-              CTA não liga. */}
           <div className="spn-field">
-            <span className="spn-field-label">Ângulos do objeto</span>
+            <span className="spn-field-label">Foto do objeto</span>
 
             {renderSlot('front', { width: '100%', height: 128, marginBottom: 7 })}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 7 }}>
-              {(['left', 'back', 'right'] as ViewPosition[]).map(pos => renderSlot(pos, { height: 72 }))}
-            </div>
+            <details style={{ marginTop: 10 }}>
+              <summary style={{ cursor: 'pointer', color: 'var(--color-text-secondary)', fontSize: 12 }}>
+                Adicionar mais ângulos (opcional)
+              </summary>
+              <p className="spn-hint">Se tiver, adicione na ordem: esquerda, trás e direita.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 7, marginTop: 9 }}>
+                {(['left', 'back', 'right'] as ViewPosition[]).map((pos, index) =>
+                  index === 0 || slotFiles[VIEW_POSITION_ORDER[index]]
+                    ? renderSlot(pos, { height: 72 })
+                    : <div key={pos} style={{ height: 72 }} />,
+                )}
+              </div>
+            </details>
 
-            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
               onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImageFile(f, activeSlotRef.current); e.target.value = '' }} />
 
             <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
               <span className="spn-hint" style={{ marginTop: 0 }}>
-                {imageCount === 0 ? 'A frente é obrigatória' : imageCount === 1 ? '1 ângulo' : `${imageCount} ângulos`}
-                {imageCount >= 1 && ' · mais ângulos, mais fidelidade'}
+                {imageCount === 0 ? 'Escolha uma foto para começar' : imageCount === 1 ? '1 foto' : `${imageCount} ângulos`}
               </span>
               {imageCount > 0 && (
                 <button type="button" className="spn-ghost" style={{ height: 28, flex: '0 0 auto' }} onClick={resetInput}>
@@ -542,18 +534,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
             </p>
           </div>
 
-          <SettingGroup>
-            <SettingRow icon={<RowIcon name="output" />} title="Saída"
-                        value={summarize([engine.label, `${nodeCost} nodes`, formatMinutes(engine.estimatedMs)])}
-                        onOpen={() => setSheet('saida')} />
-            {/* A linha de materiais só existe onde o motor a entende — uma
-                linha desabilitada seria ruído com cara de bug. */}
-            {engine.supportsTexturePrompt ? (
-              <SettingRow icon={<RowIcon name="materials" />} title="Materiais"
-                          value={summarize([texturePrompt.trim()])}
-                          onOpen={() => setSheet('materiais')} />
-            ) : null}
-          </SettingGroup>
+          <p className="spn-hint">Saída em GLB com textura e materiais PBR. A escala é estimada pela IA; confira as medidas antes de usar no projeto.</p>
 
           {error ? <div className="spn-error" style={{ marginTop: 14 }}>{error}</div> : null}
         </div>
@@ -622,6 +603,14 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
                       {downloading === f ? 'Baixando…' : FORMAT_LABEL[f]}
                     </button>
                   ))}
+                  {job.originalGlbUrl && (
+                    <button type="button" className="spn-ghost"
+                            onClick={() => handleDownload('original')} disabled={downloading !== null}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <DownloadIcon />
+                      {downloading === 'original' ? 'Baixando…' : 'Original (alta malha)'}
+                    </button>
+                  )}
                   <button type="button" className="spn-ghost"
                           onClick={() => { setJob(null); resetInput() }}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -643,8 +632,9 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center',
             }}>
               <div className="spn-error">
-                {job.errorMessage ?? 'Falha no processamento.'} Os nodes foram estornados — tente de novo
-                com outras fotos ou outra qualidade.
+                {job.errorMessage ?? 'Falha no processamento.'} {job.refunded
+                  ? 'Os nodes foram estornados.'
+                  : 'O estorno ficou pendente. Chame o suporte.'} Tente de novo com outra foto.
               </div>
               <button type="button" className="spn-ghost" onClick={() => setJob(null)}>Tentar de novo</button>
             </div>
@@ -655,7 +645,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
             <div className="spn-empty" style={{ maxWidth: 340 }}>
               O bloco 3D aparece aqui.
               <br />
-              Envie até 4 ângulos de um objeto — GLB sempre, todos os formatos no Premium.
+              Envie uma foto de um objeto. O modelo GLB aparecerá aqui.
             </div>
           )}
         </div>
@@ -670,7 +660,7 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
                 const isActive = job?.id === item.id
                 return (
                   <button key={item.id} type="button" onClick={() => selectHistoryJob(item)}
-                    title={item.status === 'failed' ? 'Falhou (estornado)' : item.status === 'processing' ? 'Gerando…' : 'Ver bloco'}
+                    title={item.status === 'failed' ? (item.refunded ? 'Falhou (estornado)' : 'Falhou (estorno pendente)') : item.status === 'processing' ? 'Gerando…' : 'Ver bloco'}
                     style={{
                       position: 'relative', width: 60, height: 60, flexShrink: 0,
                       borderRadius: 10, overflow: 'hidden', padding: 0,
@@ -712,51 +702,6 @@ export default function Blocos3DClient({ initialCredits, engineAvailability, ini
         )}
       </div>
 
-      {/* ── Folhas ─────────────────────────────────────────────────────────── */}
-      <Sheet open={sheet === 'saida'} title="Saída" onClose={() => setSheet(null)}>
-        <div className="spn-field">
-          <span className="spn-field-label">Motor</span>
-          <ChoiceGroup
-            label="Motor"
-            cols={3}
-            value={quality}
-            onChange={setQuality}
-            options={BLOCOS3D_QUALITY_ORDER.map(q => ({
-              value:    q,
-              title:    BLOCOS3D_ENGINES[q].label,
-              note:     `${BLOCOS3D_ENGINES[q].costInNodes} nodes · ${formatMinutes(BLOCOS3D_ENGINES[q].estimatedMs)}`,
-              disabled: !engineAvailability[q],
-            }))}
-          />
-          <p className="spn-hint">{engine.description}</p>
-        </div>
-        <div className="spn-field">
-          <span className="spn-field-label">O que o {engine.label} entrega</span>
-          <div className="spn-pills">
-            {[...engine.formats, ...engine.features].map(tag => (
-              <span key={tag} className="spn-pill" style={{ cursor: 'default' }}>{tag}</span>
-            ))}
-          </div>
-          {BLOCOS3D_QUALITY_ORDER.some(q => !engineAvailability[q]) ? (
-            <p className="spn-hint">Um motor apagado está indisponível agora — os outros seguem gerando.</p>
-          ) : null}
-        </div>
-      </Sheet>
-
-      <Sheet open={sheet === 'materiais'} title="Materiais" onClose={() => setSheet(null)}>
-        <div className="spn-field">
-          <span className="spn-field-label">Descrição dos materiais</span>
-          <textarea
-            className="spn-textarea"
-            value={texturePrompt}
-            onChange={e => setTexturePrompt(e.target.value.slice(0, TEXTURE_PROMPT_MAX_LEN))}
-            placeholder="Em inglês — ex.: cream boucle fabric, soft nubby wool texture, visible weave detail"
-          />
-          <p className="spn-hint">
-            Guia a texturização do modelo. Em branco, o motor segue fielmente as fotos.
-          </p>
-        </div>
-      </Sheet>
     </div>
   )
 }

@@ -23,6 +23,9 @@ fal.config({ credentials: process.env.FAL_KEY })
 
 /** Endpoint efetivo pro conjunto de imagens (Tripo troca pra multiview). */
 export function resolveFalEngineId(engine: Blocos3DEngine, images: PositionedImages<string>): string {
+  if (engine.engine === 'tripo3d/h3.1/image-to-3d' && countImages(images) > 1) {
+    return 'tripo3d/h3.1/multiview-to-3d'
+  }
   if (engine.engine === 'tripo3d/tripo/v2.5/image-to-3d' && countImages(images) > 1) {
     return 'tripo3d/tripo/v2.5/multiview-to-3d'
   }
@@ -40,12 +43,26 @@ const TRIPO_COMMON = {
 } as const
 
 /** Monta o input por endpoint (nomes de campo diferem entre os modelos). */
-function buildInput(
+export function buildInput(
   engineId: string,
   images: PositionedImages<string>,
   options: Blocos3DOptions,
 ): Record<string, unknown> {
   switch (engineId) {
+    case 'tripo3d/h3.1/image-to-3d':
+      return {
+        image_url: images.front, texture: true, pbr: true,
+        texture_quality: 'detailed', geometry_quality: 'standard',
+        texture_alignment: 'original_image', auto_size: true,
+      }
+
+    case 'tripo3d/h3.1/multiview-to-3d':
+      return {
+        image_urls: listImages(images), texture: true, pbr: true,
+        texture_quality: 'detailed', geometry_quality: 'standard',
+        texture_alignment: 'original_image', auto_size: true,
+      }
+
     case 'tripo3d/tripo/v2.5/image-to-3d':
       return { image_url: images.front, ...TRIPO_COMMON }
 
@@ -117,15 +134,19 @@ function collectUrls(value: unknown, out: string[]): void {
   }
 }
 
-function extractOutputs(result: unknown): { modelUrls: Partial<Record<ModelFormat, string>>; thumbnailUrl: string | null } {
+export function extractOutputs(result: unknown): { modelUrls: Partial<Record<ModelFormat, string>>; thumbnailUrl: string | null } {
   const urls: string[] = []
   // Preferência explícita ANTES do scan first-wins: os providers entregam o
   // GLB com PBR num campo separado que vem DEPOIS do mesh básico no objeto
   // (Hunyuan: model_glb_pbr; Tripo: pbr_model) — sem isto, o tier vendido
   // como "Materiais PBR" serviria sempre o mesh sem PBR.
   const root = result as Record<string, unknown> | null
-  for (const field of ['model_glb_pbr', 'pbr_model'] as const) {
-    const url = (root?.[field] as { url?: unknown } | undefined)?.url
+  for (const field of [
+    (root?.model_urls as Record<string, unknown> | undefined)?.pbr_model,
+    root?.model_glb_pbr,
+    root?.pbr_model,
+  ]) {
+    const url = (field as { url?: unknown } | undefined)?.url
     if (typeof url === 'string' && url.startsWith('http')) { urls.push(url); break }
   }
   collectUrls(result, urls)

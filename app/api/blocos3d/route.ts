@@ -23,8 +23,10 @@ import {
   normalizeBlocos3DOptions,
   normalizeSourceKeys,
   countImages,
+  validViewSequence,
   VIEW_POSITION_ORDER,
 } from '@/lib/blocos3d/config'
+import { validateBlocos3DImages } from '@/lib/blocos3d/validate-source'
 import { createProviderTask, engineAvailable } from '@/lib/blocos3d/provider'
 import { MeshyError } from '@/lib/blocos3d/meshy'
 import { BLOCOS3D_JOB_COLUMNS, toJobView, type Blocos3DJobRow } from '@/lib/blocos3d/view'
@@ -52,11 +54,14 @@ export async function POST(req: NextRequest) {
 
   if (!sourceKeys) return NextResponse.json({ error: 'Imagem da frente obrigatória' }, { status: 400 })
   if (!options)    return NextResponse.json({ error: 'Opções inválidas' }, { status: 400 })
+  if (!validViewSequence(sourceKeys)) {
+    return NextResponse.json({ error: 'Adicione os ângulos na ordem: frente, esquerda, trás, direita.' }, { status: 400 })
+  }
 
   const engine = getBlocos3DEngine(options.quality)
   if (!engineAvailable(engine)) {
     return NextResponse.json(
-      { error: `Qualidade ${engine.label} indisponível no momento.` },
+      { error: 'Geração 3D indisponível no momento.' },
       { status: 503 },
     )
   }
@@ -78,6 +83,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: bad.res.message }, { status: bad.res.status })
   }
   const frontPublicUrl = (verified[0].res as { ok: true; url: string }).url
+
+  // Verifica TODAS as vistas antes do débito: um ângulo corrompido ou pequeno
+  // também desperdiça uma chamada paga, mesmo quando a frente está correta.
+  const badImage = await validateBlocos3DImages(sourceKeys, positions,
+    key => admin.storage.from(area.bucket).download(key))
+  if (badImage) return NextResponse.json({ error: badImage.error }, { status: badImage.status })
 
   const nodesToCharge = engine.costInNodes
 
@@ -157,10 +168,10 @@ export async function POST(req: NextRequest) {
       const payerId = (await getPayerId(admin, user.id)) ?? user.id
       const { data: balance } = await admin
         .from('user_node_balance')
-        .select('plan_balance')
+        .select('total_balance')
         .eq('user_id', payerId)
         .single()
-      credits = balance?.plan_balance ?? undefined
+      credits = balance?.total_balance ?? undefined
     } catch (e) {
       console.warn('[blocos3d] leitura de saldo pós-débito falhou (não crítico):', (e as Error)?.message)
     }

@@ -27,14 +27,16 @@ export interface Blocos3DJobRow {
   model_usdz_key:      string | null
   thumbnail_key:       string | null
   provider_model_urls: Record<string, unknown> | null
+  options:             Record<string, unknown> | null
   nodes_cost:          number | null
   error_message:       string | null
+  refunded:            boolean
   created_at:          string
   completed_at:        string | null
 }
 
 export const BLOCOS3D_JOB_COLUMNS =
-  'id, status, progress, quality, input_image_url, model_glb_key, model_fbx_key, model_obj_key, model_usdz_key, thumbnail_key, provider_model_urls, nodes_cost, error_message, created_at, completed_at'
+  'id, status, progress, quality, input_image_url, model_glb_key, model_fbx_key, model_obj_key, model_usdz_key, thumbnail_key, provider_model_urls, options, nodes_cost, error_message, refunded, created_at, completed_at'
 
 const MODEL_KEY_FIELDS: Record<ModelFormat, keyof Blocos3DJobRow> = {
   glb:  'model_glb_key',
@@ -64,10 +66,12 @@ export async function toJobView(
 ): Promise<Blocos3DJobView> {
   const includeModels = opts.includeModelUrls !== false
   const formats = includeModels ? (Object.keys(MODEL_KEY_FIELDS) as ModelFormat[]) : []
+  const originalKey = typeof row.options?.original_glb_key === 'string' ? row.options.original_glb_key : null
 
-  const [inputUrl, thumbFromKey, ...modelSigned] = await Promise.all([
+  const [inputUrl, thumbFromKey, originalGlbUrl, ...modelSigned] = await Promise.all([
     signStorageUrl(admin, row.input_image_url),
     row.thumbnail_key ? signStorageKey(admin, BUCKET, row.thumbnail_key, SIGNED_TTL_SECONDS) : Promise.resolve(null),
+    includeModels && originalKey ? signStorageKey(admin, BUCKET, originalKey, SIGNED_TTL_SECONDS) : Promise.resolve(null),
     ...formats.map(f => {
       const key = row[MODEL_KEY_FIELDS[f]] as string | null
       return key ? signStorageKey(admin, BUCKET, key, SIGNED_TTL_SECONDS) : Promise.resolve(null)
@@ -91,8 +95,10 @@ export async function toJobView(
     inputUrl,
     thumbnailUrl: thumbFromKey ?? providerUrl(row, 'thumbnail'),
     modelUrls,
+    originalGlbUrl,
     nodesCost:    row.nodes_cost ?? 0,
     errorMessage: row.error_message,
+    refunded:     row.refunded ?? false,
     createdAt:    row.created_at,
     completedAt:  row.completed_at,
   }
