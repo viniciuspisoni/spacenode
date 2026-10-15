@@ -2,14 +2,32 @@
   "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.spacenode.app" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "www.spacenode.app"
+        }
+      ],
       "destination": "https://spacenode.app/:path*",
       "permanent": true
     }
   ],
   "crons": [
-    { "path": "/api/cron/ads-alerts", "schedule": "0 9 * * *" },
-    { "path": "/api/cron/ads-report", "schedule": "0 9 * * 1" },
-    { "path": "/api/cron/expire-nodes", "schedule": "0 6 * * *" }
+    {
+      "path": "/api/cron/ads-alerts",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/ads-report",
+      "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/cron/expire-nodes",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/annual-nodes",
+      "schedule": "0 * * * *"
+    }
   ]
 }

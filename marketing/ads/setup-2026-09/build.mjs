@@ -19,7 +19,7 @@ const G = {
       lp: '/lp/print-do-sketchup', ad: 'sn_google_captacao_arquiteto_fidelidade_rsa01_copy01',
       exact: ['renderizar sketchup', 'render sketchup', 'render sketchup online', 'renderizar sketchup online', 'renderizar modelo do sketchup', 'sketchup com ia', 'ia para sketchup', 'render com ia sketchup', 'renderizador sketchup', 'render rápido sketchup'],
       phrase: ['renderizar sketchup'],
-      headlines: ['Renderize Prints do SketchUp', 'Do SketchUp ao Render com IA', 'Do Print ao Fotorrealista', 'Render Fiel ao Seu Modelo', 'Fotorrealismo em Minutos', 'Sem Render de Madrugada', 'Cadastro Grátis, Sem Cartão', 'A partir de R$ 89/mês', 'Seu Cliente Entende o Render', 'Funciona com Qualquer Print', 'Upload da Imagem e Pronto', 'Tudo no Navegador', 'Feito por Arquiteto, no Brasil'],
+      headlines: ['Renderize Prints do SketchUp', 'Do SketchUp ao Render com IA', 'Do Print ao Fotorrealista', 'Render Fiel ao Seu Modelo', 'Fotorrealismo em Minutos', 'Sem Render de Madrugada', 'Cadastro Grátis, Sem Cartão', 'A partir de R$ 149/mês', 'Seu Cliente Entende o Render', 'Funciona com Qualquer Print', 'Upload da Imagem e Pronto', 'Tudo no Navegador', 'Feito por Arquiteto, no Brasil'],
       pin1: ['Renderize Prints do SketchUp', 'Do SketchUp ao Render com IA'],
       descriptions: ['Faça upload do print do SketchUp e receba o render fotorrealista em minutos, no navegador.', 'O render respeita o seu projeto: paredes, aberturas e proporções ficam como no print.', 'Sem render de madrugada: o modelo que você já tem vira apresentação, direto no navegador.', 'Feito por um arquiteto brasileiro. Cadastro grátis com 80 nodes para testar de verdade.'],
       path: ['sketchup', 'render'],
@@ -37,9 +37,9 @@ const G = {
       lp: '/lp/planta-humanizada', ad: 'sn_google_captacao_arquiteto_apresentacao_rsa01_copy01',
       exact: ['planta humanizada', 'planta humanizada online', 'planta humanizada com ia', 'planta humanizada ia', 'fazer planta humanizada', 'programa para planta humanizada', 'planta humanizada automática', 'planta baixa humanizada', 'humanizar planta baixa', 'humanizar planta'],
       phrase: [],
-      headlines: ['Planta Humanizada com IA', 'Planta Humanizada Online', 'Da Planta Técnica à Humanizada', 'Humanize Plantas em Minutos', 'Cores, Pisos e Mobiliário', 'Apresente a Planta ao Cliente', 'Cadastro Grátis, Sem Cartão', 'A partir de R$ 89/mês', 'Sem Retoque Manual, Sem Demora', 'Feito para Arquitetura', 'Envie a Planta e Pronto', 'Respeita o Desenho da Planta'],
+      headlines: ['Planta Humanizada com IA', 'Planta Humanizada Online', 'Da Planta Técnica à Humanizada', 'Humanize Plantas em Minutos', 'Cores, Pisos e Mobiliário', 'Apresente a Planta ao Cliente', 'Cadastro Grátis, Sem Cartão', 'A partir de R$ 149/mês', 'Sem Retoque Manual, Sem Demora', 'Feito para Arquitetura', 'Envie a Planta e Pronto', 'Respeita o Desenho da Planta'],
       pin1: ['Planta Humanizada com IA', 'Planta Humanizada Online'],
-      descriptions: ['Envie a planta técnica e receba a versão humanizada em minutos, pronta para apresentar.', 'Pisos, cores e mobiliário aplicados com IA, respeitando o desenho da sua planta.', 'Sem horas de retoque manual: a planta humanizada sai no navegador, sem hardware caro.', 'Cadastro grátis com 80 nodes para testar. Planos a partir de R$ 89 por mês.'],
+      descriptions: ['Envie a planta técnica e receba a versão humanizada em minutos, pronta para apresentar.', 'Pisos, cores e mobiliário aplicados com IA, respeitando o desenho da sua planta.', 'Sem horas de retoque manual: a planta humanizada sai no navegador, sem hardware caro.', 'Cadastro grátis com 80 nodes para testar. Planos a partir de R$ 149 por mês.'],
       path: ['planta', 'humanizada'],
     },
   },
@@ -84,9 +84,9 @@ write('google-04-anuncios-rsa.csv', csv([['Campaign', 'Ad Group', 'Ad type', 'St
 G.callouts.forEach(c => chk('callout', c, 25))
 G.snippet.values.forEach(v => chk('snippet value', v, 25))
 const sitelinks = {
-  SKETCHUP: [['Planta humanizada', 'Da planta técnica à humanizada', 'Cores, pisos e mobiliário', '/lp/planta-humanizada'], ['Plugin para SketchUp', 'Renderize dentro do SketchUp', 'Grátis, usa os nodes da conta', '/sketchup'], ['Planos a partir de R$ 89', '750 nodes por mês', 'Cadastro grátis, sem cartão', '/']],
-  PLUGIN: [['Do print ao render', 'Qualquer print funciona', 'Render fiel ao modelo', '/lp/print-do-sketchup'], ['Planta humanizada', 'Da planta técnica à humanizada', 'Cores, pisos e mobiliário', '/lp/planta-humanizada'], ['Planos a partir de R$ 89', '750 nodes por mês', 'Cadastro grátis, sem cartão', '/']],
-  PLANTAHUM: [['Do print ao render', 'Qualquer print funciona', 'Render fiel ao modelo', '/lp/print-do-sketchup'], ['Plugin para SketchUp', 'Renderize dentro do SketchUp', 'Grátis, usa os nodes da conta', '/sketchup'], ['Planos a partir de R$ 89', '750 nodes por mês', 'Cadastro grátis, sem cartão', '/']],
+  SKETCHUP: [['Planta humanizada', 'Da planta técnica à humanizada', 'Cores, pisos e mobiliário', '/lp/planta-humanizada'], ['Plugin para SketchUp', 'Renderize dentro do SketchUp', 'Grátis, usa os nodes da conta', '/sketchup'], ['Planos a partir de R$ 149', '800 nodes por mês', 'Cadastro grátis, sem cartão', '/']],
+  PLUGIN: [['Do print ao render', 'Qualquer print funciona', 'Render fiel ao modelo', '/lp/print-do-sketchup'], ['Planta humanizada', 'Da planta técnica à humanizada', 'Cores, pisos e mobiliário', '/lp/planta-humanizada'], ['Planos a partir de R$ 149', '800 nodes por mês', 'Cadastro grátis, sem cartão', '/']],
+  PLANTAHUM: [['Do print ao render', 'Qualquer print funciona', 'Render fiel ao modelo', '/lp/print-do-sketchup'], ['Plugin para SketchUp', 'Renderize dentro do SketchUp', 'Grátis, usa os nodes da conta', '/sketchup'], ['Planos a partir de R$ 149', '800 nodes por mês', 'Cadastro grátis, sem cartão', '/']],
 }
 const extRows = []
 for (const [k, list] of Object.entries(sitelinks)) for (const [t, d1, d2, p] of list) {
@@ -119,8 +119,8 @@ const M = {
     ] },
   },
   copy: {
-    COPY01: { body: 'Você modela no SketchUp? O print do modelo vira render fotorrealista, sem nada sair do lugar. Feito por arquiteto.\nPlanos a partir de R$ 89/mês. Comece com 80 nodes grátis, sem cartão.', title: 'Render fiel ao seu SketchUp', desc: '80 nodes grátis · sem cartão' },
-    COPY02: { body: 'Para arquitetos: reunião de manhã com o print do SketchUp, reunião da tarde com a imagem. Render em minutos, no navegador.\nPlanos a partir de R$ 89/mês. Comece com 80 nodes grátis, sem cartão.', title: 'Do print à imagem, em minutos', desc: '80 nodes grátis · sem cartão' },
+    COPY01: { body: 'Você modela no SketchUp? O print do modelo vira render fotorrealista, sem nada sair do lugar. Feito por arquiteto.\nPlanos a partir de R$ 149/mês. Comece com 80 nodes grátis, sem cartão.', title: 'Render fiel ao seu SketchUp', desc: '80 nodes grátis · sem cartão' },
+    COPY02: { body: 'Para arquitetos: reunião de manhã com o print do SketchUp, reunião da tarde com a imagem. Render em minutos, no navegador.\nPlanos a partir de R$ 149/mês. Comece com 80 nodes grátis, sem cartão.', title: 'Do print à imagem, em minutos', desc: '80 nodes grátis · sem cartão' },
     COPY03: { body: 'Renderize sem sair do SketchUp: o plugin captura a cena, a lente e o sol do seu modelo e devolve a imagem em minutos.\nPlugin grátis. Cadastro com 80 nodes, sem cartão.', title: 'Render dentro do SketchUp', desc: 'Plugin grátis · SketchUp 2021+' },
     COPY04: { body: 'Três cenas do SketchUp, um clique, três renders com o mesmo preset. O plugin renderiza em lote, dentro do seu modelo.\nPlugin grátis. Cadastro com 80 nodes, sem cartão.', title: 'Cenas em lote, dentro do SketchUp', desc: 'Plugin grátis · SketchUp 2021+' },
   },

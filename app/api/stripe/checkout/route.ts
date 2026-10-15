@@ -12,6 +12,7 @@ import {
   isSellablePlanId,
   getPlanById,
   getStripePriceId,
+  matchesPublishedPrice,
   type PaidPlanId,
   type BillingCycle,
 } from '@/lib/plans'
@@ -182,6 +183,12 @@ export async function POST(req: NextRequest) {
     if (!priceId) {
       console.error('[checkout] missing Stripe price id for', plan.id, body.billing)
       return NextResponse.json({ error: 'Configuração indisponível' }, { status: 500 })
+    }
+
+    const configuredPrice = await stripe.prices.retrieve(priceId)
+    if (!matchesPublishedPrice(configuredPrice, plan, body.billing)) {
+      console.error('[checkout] preço Stripe diverge da tabela publicada', plan.id, body.billing)
+      return NextResponse.json({ error: 'Este plano está em atualização. Tente novamente em instantes.' }, { status: 503 })
     }
 
     // ── Oferta de lançamento: 50% na primeira mensalidade ────────────────

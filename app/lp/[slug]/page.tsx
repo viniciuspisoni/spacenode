@@ -29,7 +29,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getLandingPageBySlug, recordAcquisitionEvent } from '@/lib/marketing/ads/service'
 import { isBotUserAgent, isInternalHost, isNonProductionRuntime } from '@/lib/analytics/internal'
 import { getEnabledModules } from '@/lib/nav/modules-config'
-import { SELLABLE_PLANS } from '@/lib/plans'
+import { ANNUAL_BILLING_ENABLED, ANNUAL_DISCOUNT_PERCENT, SELLABLE_PLANS } from '@/lib/plans'
 import { rateLimit } from '@/lib/rate-limit'
 import type { LandingPage, LandingSection } from '@/lib/marketing/ads/types'
 
@@ -695,6 +695,19 @@ function PricingSection({
 
   return (
     <SectionShell id="planos" eyebrow="Planos" title="quanto custa.">
+      {ANNUAL_BILLING_ENABLED && (
+        <div className="mb-6 text-sm text-text-secondary">
+          <p>Anual com {ANNUAL_DISCOUNT_PERCENT}% de desconto, cobrado uma vez por ano. Os Nodes continuam sendo liberados a cada mês.</p>
+          <div className="mt-3 flex flex-wrap gap-4">
+            {plans.map(plan => (
+              <LpCtaLink key={plan.id} href={`${linkFor(plan.id).href}&billing=annual`}
+                slug={slug} position="pricing" intent={{ plan: plan.id, billing: 'annual' }}>
+                {plan.name}: {plan.annualTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/ano
+              </LpCtaLink>
+            ))}
+          </div>
+        </div>
+      )}
       {/* ── Mobile ─────────────────────────────────────────────────── */}
       <div className="sm:hidden">
         <div

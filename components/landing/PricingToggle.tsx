@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { track } from '@/lib/analytics/client'
-import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, recommendPlan, type SellablePlanId, type PaidPlanId, type BillingCycle } from '@/lib/plans'
+import { ANNUAL_BILLING_ENABLED, ANNUAL_DISCOUNT_PERCENT, SELLABLE_PLANS, recommendPlan, type SellablePlanId, type PaidPlanId, type BillingCycle } from '@/lib/plans'
 import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
 import { NODES_GRACE_DAYS, NODES_ROLLOVER_COPY_LANDING } from '@/lib/billing/nodes'
 import { SUPPORT_EMAIL, supportWhatsAppUrl } from '@/lib/support'
@@ -29,7 +29,6 @@ interface PlanDisplay {
   rendersHD: number
   renders2K: number
   renders4K: number
-  monthlyAnnualLabel: string
   meterPct: number
   featured: boolean
   badge: string
@@ -54,7 +53,7 @@ interface PlanDisplay {
 const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
   essence: {
     rendersHD: 80,  renders2K: 40,  renders4K: 20,
-    monthlyAnnualLabel: '990', meterPct: 20, featured: false, badge: '',
+    meterPct: 20, featured: false, badge: '',
     // O acúmulo entra AQUI e só aqui: é fato de plataforma, vale para todo
     // plano pago, então mora na base da escada e sobe por herança ("Tudo do
     // Essence"). Repeti-lo nos três cartões traria de volta exatamente a
@@ -70,7 +69,7 @@ const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
   },
   pro: {
     rendersHD: 180, renders2K: 90,  renders4K: 45,
-    monthlyAnnualLabel: '1.990', meterPct: 45, featured: true, badge: 'recomendado',
+    meterPct: 45, featured: true, badge: 'recomendado',
     features: [
       { label: 'Tudo do Essence' },
       {
@@ -82,7 +81,7 @@ const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
   },
   studio: {
     rendersHD: 400, renders2K: 200, renders4K: 100,
-    monthlyAnnualLabel: '3.990', meterPct: 100, featured: false, badge: '',
+    meterPct: 100, featured: false, badge: '',
     // Sem segunda linha de propósito (decisão do dono, 2026-09-10): detalhar
     // o prioritário viraria promessa operacional com hora marcada, e hoje o
     // suporte é uma pessoa só. O rótulo já existia; só não vira contrato.
@@ -138,7 +137,7 @@ function PlanCard({ planId, billing, loading, onSelect }: {
       </div>
 
       {billing === 'annual' && (
-        <p className="spn-plan-annual">R$ {d.monthlyAnnualLabel} cobrado anualmente</p>
+        <p className="spn-plan-annual">R$ {formatBRL(plan.annualTotal)} cobrado anualmente</p>
       )}
 
       <div className="spn-plan-nodes">
@@ -415,7 +414,7 @@ export function PricingToggle() {
             </button>
             <button type="button" onClick={() => setBilling('annual')} data-on={billing === 'annual'}>
               Anual
-              <span className="spn-pricing-toggle-tag">2 meses grátis</span>
+              <span className="spn-pricing-toggle-tag">{ANNUAL_DISCOUNT_PERCENT}% de desconto</span>
             </button>
           </div>
         )}

@@ -1,3 +1,5 @@
+> Atualização comercial aprovada em 15/10/2026: novas assinaturas Essence R$149/mês, Pro R$299/mês e Studio R$499/mês. Anuais com 25% de desconto: R$1.341, R$2.691 e R$4.491 por ano, respectivamente. A ativação depende da configuração e validação descritas em `docs/PRICING.md`. Assinaturas existentes mantêm o valor contratado enquanto ativas. Consulte essa referência antes de reaproveitar qualquer condição histórica abaixo.
+
 # SPACENODE — Conteúdo proibido
 
 > Lista consolidada do que **nunca** entra em uma peça, orgânica ou paga. É a base do verificador

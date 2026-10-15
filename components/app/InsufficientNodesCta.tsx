@@ -13,7 +13,7 @@
 //   - Sempre oferecer a alternativa que NÃO gera receita
 
 import Link from 'next/link'
-import { PLANS } from '@/lib/plans'
+import { SELLABLE_PLANS } from '@/lib/plans'
 
 interface Props {
   /** Custo da geração configurada, em nodes. */
@@ -26,7 +26,7 @@ interface Props {
 
 export default function InsufficientNodesCta({ needed, available, alternative }: Props) {
   const missing  = Math.max(0, needed - available)
-  const cheapest = PLANS.reduce((min, p) => (p.monthlyPrice < min.monthlyPrice ? p : min), PLANS[0])
+  const cheapest = SELLABLE_PLANS.reduce((min, p) => (p.monthlyPrice < min.monthlyPrice ? p : min), SELLABLE_PLANS[0])
   const progress = needed > 0 ? Math.min(100, (available / needed) * 100) : 0
 
   return (

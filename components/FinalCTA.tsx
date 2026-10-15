@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import { SELLABLE_PLANS } from '@/lib/plans'
 
 // O primeiro render vem do acervo selecionado pelo dono para o carrossel;
 // os demais já estão publicados na galeria da landing.
@@ -83,7 +84,7 @@ export default function FinalCTA() {
           </a>
         </div>
 
-        <p className="spn-final-microcopy">80 Nodes grátis · sem cartão · planos a partir de R$ 99/mês</p>
+        <p className="spn-final-microcopy">80 Nodes grátis · sem cartão · planos a partir de R$ {SELLABLE_PLANS[0].monthlyPrice}/mês</p>
       </div>
 
       <div className="spn-final-gallery" aria-label="Projetos de usuários SpaceNode">

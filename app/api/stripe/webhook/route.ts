@@ -536,9 +536,12 @@ export async function POST(req: NextRequest) {
         // Fatura de proporcional (upgrade no meio do ciclo). Downgrade não cai
         // aqui com valor: vira crédito na conta do Stripe, amount_paid = 0.
         // O saldo acumulado NUNCA é tocado — a troca vale daqui pra frente.
+        // A fatura pode pertencer ao preço anterior, mantido para assinantes
+        // atuais. Calcular pelo Price real evita usar a tabela de novas vendas.
+        const billedPrice = await stripe.prices.retrieve(linePriceId(lineItem)!)
         const nodes = prorationNodes(
           invoice.amount_paid,
-          match.plan.monthlyPrice * 100,
+          billedPrice.unit_amount ?? 0,
           match.plan.nodes
         )
         if (nodes <= 0) {

@@ -3,8 +3,8 @@ import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
-import { ANNUAL_BILLING_ENABLED, isSellablePlanId, type BillingCycle } from '@/lib/plans'
-import { BillingClient, type ExtraPackRow, type CheckoutNotice, type ResumeCheckout } from './BillingClient'
+import { ANNUAL_BILLING_ENABLED, isSellablePlanId, findPlanByStripePriceId, getStripePriceId, type BillingCycle } from '@/lib/plans'
+import { BillingClient, type ExtraPackRow, type CheckoutNotice, type ResumeCheckout, type CurrentContract } from './BillingClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,6 +79,27 @@ async function readCheckoutNotice(
   }
 }
 
+/** O valor contratado vem da Stripe, e não da vitrine de novas assinaturas. */
+async function readCurrentContract(subscriptionId: string | null | undefined): Promise<CurrentContract | null> {
+  if (!subscriptionId) return null
+  try {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+    const sub = await stripe.subscriptions.retrieve(subscriptionId)
+    if (!['active', 'past_due', 'trialing'].includes(sub.status) || sub.items.data.length !== 1) return null
+    const item = sub.items.data[0]
+    const match = findPlanByStripePriceId(item.price.id)
+    if (!match || item.price.currency !== 'brl' || item.price.unit_amount === null) return null
+    return {
+      amount: item.price.unit_amount * (item.quantity ?? 1) / 100,
+      billing: match.billing,
+      grandfathered: item.price.id !== getStripePriceId(match.plan.id, match.billing),
+    }
+  } catch (error) {
+    console.warn('[billing] falha ao consultar o contrato atual:', error)
+    return null
+  }
+}
+
 export default async function BillingPage({ searchParams }: Props) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -106,18 +127,22 @@ export default async function BillingPage({ searchParams }: Props) {
   // fora porque quem paga é o dono da bolsa.
   const { data: own } = await admin
     .from('profiles')
-    .select('stripe_customer_id')
+    .select('stripe_customer_id, stripe_subscription_id')
     .eq('id', user.id)
     .single()
   const offerEligible = !balance.pooled && balance.planId === 'free' && !own?.stripe_customer_id
 
   const sp = await searchParams
-  const notice = await readCheckoutNotice(sp.session_id, user.id)
+  const [notice, currentContract] = await Promise.all([
+    readCheckoutNotice(sp.session_id, user.id),
+    balance.pooled ? Promise.resolve(null) : readCurrentContract(own?.stripe_subscription_id),
+  ])
   const resume = resumeFrom(sp, balance.planId, balance.pooled)
 
   return (
     <BillingClient
       notice={notice}
+      currentContract={currentContract}
       canceled={sp.canceled === 'true' && balance.planId === 'free' && !balance.pooled}
       resume={resume}
       plan={balance.planId}

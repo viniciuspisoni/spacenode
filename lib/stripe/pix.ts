@@ -49,9 +49,8 @@ export const PIX_EXPIRES_AFTER_SECONDS = 3600
 
 /**
  * Pix Automático só é oferecido no ciclo mensal. `payment_schedule` do mandato
- * espelha a periodicidade da cobrança, e o ciclo anual está pausado
- * (ANNUAL_BILLING_ENABLED) — sem uma assinatura anual real para testar contra,
- * oferecer Pix nela seria chutar.
+ * espelha a periodicidade mensal. O anual é cobrado de uma vez no cartão;
+ * Pix anual depende de validação específica da conta e do mandato.
  */
 export function pixAllowedForCycle(billing: BillingCycle): boolean {
   return billing === 'monthly'

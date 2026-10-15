@@ -48,7 +48,7 @@ vi.mock('stripe', () => {
     static errors = { StripeError }
     customers = { retrieve: async () => ({ id: 'cus_e2e' }) }
     subscriptions = { retrieve: async () => ({ status: 'active', metadata: {} }), list: async () => ({ data: [] }) }
-    prices = { retrieve: async () => ({ unit_amount: 9900 }) }
+    prices = { retrieve: async () => ({ active: true, currency: 'brl', unit_amount: 14900, recurring: { interval: 'month', interval_count: 1 } }) }
     checkout = {
       sessions: {
         create: async (params: Record<string, unknown>) => {
@@ -87,7 +87,7 @@ const ORIGIN = 'https://spacenode.app'
 const LINKS_DOC = 'marketing/ads/2026-10-LINKS-META-PRIMEIROS-PAGANTES.md'
 const ANON_INSTAGRAM = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
 const ENV_KEYS = [
-  'VERCEL_ENV', 'NEXT_PUBLIC_APP_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_ID_ESSENCE_MONTHLY',
+  'VERCEL_ENV', 'NEXT_PUBLIC_APP_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_ID_ESSENCE_MONTHLY', 'STRIPE_PRICE_ID_ESSENCE_MONTHLY_V202610',
 ] as const
 const savedEnv: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {}
 
@@ -121,7 +121,8 @@ beforeAll(async () => {
     NEXT_PUBLIC_APP_URL: ORIGIN,
     STRIPE_SECRET_KEY: 'sk_test_e2e',
     STRIPE_WEBHOOK_SECRET: 'whsec_e2e',
-    STRIPE_PRICE_ID_ESSENCE_MONTHLY: 'price_essence_monthly_e2e',
+    STRIPE_PRICE_ID_ESSENCE_MONTHLY: 'price_essence_monthly_legacy',
+    STRIPE_PRICE_ID_ESSENCE_MONTHLY_V202610: 'price_essence_monthly_e2e',
   })
   db = createMemorySupabase(
     { 'marketing.ad_channels': [{ slug: 'meta', name: 'Meta', status: 'enabled' }] },

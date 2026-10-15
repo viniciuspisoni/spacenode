@@ -15,7 +15,7 @@
 // Este módulo roda no SERVIDOR (rotas /api/nodi/*). O painel só recebe os
 // títulos (sugestões/FAQ) e pede a resposta por id.
 
-import { SELLABLE_PLANS } from '@/lib/plans'
+import { ANNUAL_BILLING_ENABLED, ANNUAL_DISCOUNT_PERCENT, SELLABLE_PLANS } from '@/lib/plans'
 import { EXTRA_NODE_PACKS } from '@/lib/extra-nodes'
 import { NODES_GRACE_DAYS, NODES_ROLLOVER_COPY } from '@/lib/billing/nodes'
 import { ENGINES, ENGINE_ORDER } from '@/lib/engines'
@@ -227,7 +227,8 @@ export const KB_ENTRIES: KBEntry[] = [
     build: () => ({
       text:
         SELLABLE_PLANS.map(p =>
-          `• ${p.name}: ${p.nodes.toLocaleString('pt-BR')} nodes/mês — ${brl(p.monthlyPrice)}/mês (ou ${brl(p.annualMonthlyPrice)}/mês no anual)`,
+          `• ${p.name}: ${p.nodes.toLocaleString('pt-BR')} nodes/mês — ${brl(p.monthlyPrice)}/mês` +
+          (ANNUAL_BILLING_ENABLED ? `; anual de ${brl(p.annualTotal)}, cobrado uma vez por ano (equivalente a ${brl(p.annualMonthlyPrice)}/mês; ${ANNUAL_DISCOUNT_PERCENT}% de desconto)` : ''),
         ).join('\n') +
         '\n' + NODES_ROLLOVER_COPY + ' O que sobra de um mês soma com os nodes do mês seguinte.' +
         '\nO cadastro concede nodes de cortesia para testar com um projeto real. Upgrade e downgrade ficam em Planos — trocar de plano não zera o saldo acumulado.' +

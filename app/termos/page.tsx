@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '2 de outubro de 2026'
+const UPDATED_AT = '15 de outubro de 2026'
 
 export default function TermosPage() {
   return (
@@ -140,7 +140,9 @@ export default function TermosPage() {
           </LI>
           <LI>
             Preços, planos e a tabela de consumo por ferramenta podem ser alterados. Alterações não são
-            retroativas: valem a partir do ciclo seguinte e serão comunicadas com antecedência razoável.
+            retroativas e serão comunicadas com antecedência razoável. Na atualização de preços de
+            15/10/2026, o valor contratado pelos assinantes existentes é mantido enquanto a assinatura
+            permanecer ativa. Após o encerramento, uma nova contratação segue a tabela vigente.
           </LI>
         </UL>
       </LegalSection>
