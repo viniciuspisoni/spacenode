@@ -200,6 +200,13 @@ export function runBrandCheck(
   const allText = fields.map(f => f.text).join('\n')
   const allRaw = fields.map(f => f.raw).join('\n')
 
+  // Tabela substituída em 15/10/2026: impedir que materiais de captação
+  // reaproveitados publiquem preços antigos. R$89 de Nodes extras é válido.
+  const oldPrice = /(?:planos?|assinaturas?|essence|pro|studio|starter)[^.!?\n]{0,85}R\$\s*(?:89|99|199|349|399)(?:[,.]00)?(?!\d|[,.]\d)/iu
+  if (oldPrice.test(allRaw) || /R\$\s*(?:99|199|349|399)(?:[,.]00)?\s*\/m[eê]s/iu.test(allRaw)) {
+    issues.push({ severity: 'blocker', code: 'outdated_pricing', message: 'Preço antigo na oferta. Consultar docs/PRICING.md antes de publicar.' })
+  }
+
   // 1. Léxico proibido, frases-molde proibidas e claims falsos → BLOCKER
   for (const f of fields) {
     for (const word of rules.prohibitedWords) {

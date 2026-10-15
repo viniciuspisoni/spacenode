@@ -1,4 +1,5 @@
-// Catálogo de planos da Pricing v2.2 (Essence, 2026-09-12).
+// Tabela de novas assinaturas aprovada em 2026-10-15. Contratos existentes
+// continuam vinculados aos Price IDs originais da Stripe.
 //
 // Os Stripe price IDs ficam em env vars server-side, não no array
 // (mantém o padrão atual do .env.local: STRIPE_PRICE_ID_X_Y, sem
@@ -14,14 +15,10 @@ export type PaidPlanId   = Exclude<PlanId, 'free'>
 export type SellablePlanId = Exclude<PaidPlanId, 'office' | 'starter'>
 export type BillingCycle = 'monthly' | 'annual'
 
-/**
- * Venda do ciclo anual PAUSADA para o go-live: a reposição mensal de nodes
- * de uma assinatura anual ainda não existe (o webhook só recarrega em
- * `invoice.paid` com billing_reason=subscription_cycle, que numa assinatura
- * anual dispara 1× por ano — mas a UI e os Termos prometem nodes/mês).
- * Religar apenas quando houver mecanismo de recarga mensal para anuais.
- */
-export const ANNUAL_BILLING_ENABLED = false
+/** Ativar após configurar os seis preços novos e validar a recarga mensal anual. */
+export const ANNUAL_BILLING_ENABLED = process.env.NEXT_PUBLIC_ANNUAL_BILLING_ENABLED === '1'
+export const ANNUAL_DISCOUNT_PERCENT = 25
+export const PRICING_VERSION = '202610'
 
 /**
  * Nodes grátis do cadastro. Quem concede de fato é o DEFAULT de
@@ -68,9 +65,9 @@ export const PLANS: Plan[] = [
   {
     id:                 'essence',
     name:               'Essence',
-    monthlyPrice:       99,
-    annualMonthlyPrice: 83,
-    annualTotal:        990,
+    monthlyPrice:       149,
+    annualMonthlyPrice: 111.75,
+    annualTotal:        1341,
     nodes:              800,
     description:        'Autônomo começando a produzir',
     recommended:        false,
@@ -79,9 +76,9 @@ export const PLANS: Plan[] = [
   {
     id:                 'pro',
     name:               'Pro',
-    monthlyPrice:       199,
-    annualMonthlyPrice: 167,
-    annualTotal:        1990,
+    monthlyPrice:       299,
+    annualMonthlyPrice: 224.25,
+    annualTotal:        2691,
     nodes:              1800,
     description:        'Profissional autônomo em produção',
     recommended:        true,
@@ -90,9 +87,9 @@ export const PLANS: Plan[] = [
   {
     id:                 'studio',
     name:               'Studio',
-    monthlyPrice:       399,
-    annualMonthlyPrice: 333,
-    annualTotal:        3990,
+    monthlyPrice:       499,
+    annualMonthlyPrice: 374.25,
+    annualTotal:        4491,
     nodes:              4000,
     description:        'Escritório com volume e equipe',
     recommended:        false,
@@ -154,7 +151,9 @@ export function recommendPlan(nodesNeeded: number): Plan {
  */
 export function getStripePriceId(planId: PaidPlanId, billing: BillingCycle): string | undefined {
   const key = `STRIPE_PRICE_ID_${planId.toUpperCase()}_${billing.toUpperCase()}`
-  return process.env[key]
+  // IDs versionados são exclusivos de novas compras. Nunca substituir os IDs
+  // originais: eles continuam resolvendo as renovações dos clientes atuais.
+  return process.env[isSellablePlanId(planId) ? `${key}_V${PRICING_VERSION}` : key]
 }
 
 /**
@@ -166,10 +165,23 @@ export function findPlanByStripePriceId(
 ): { plan: Plan; billing: BillingCycle } | undefined {
   for (const plan of PLANS) {
     for (const billing of ['monthly', 'annual'] as const) {
-      if (getStripePriceId(plan.id, billing) === priceId) {
+      const originalKey = `STRIPE_PRICE_ID_${plan.id.toUpperCase()}_${billing.toUpperCase()}`
+      if (getStripePriceId(plan.id, billing) === priceId || process.env[originalKey] === priceId) {
         return { plan, billing }
       }
     }
   }
   return undefined
+}
+
+/** Checkout novo só aceita o valor e a periodicidade anunciados. */
+export function matchesPublishedPrice(
+  price: { active: boolean; currency: string; unit_amount: number | null; recurring: { interval: string; interval_count: number } | null },
+  plan: Plan,
+  billing: BillingCycle,
+): boolean {
+  return price.active && price.currency === 'brl' &&
+    price.unit_amount === Math.round((billing === 'annual' ? plan.annualTotal : plan.monthlyPrice) * 100) &&
+    price.recurring?.interval === (billing === 'annual' ? 'year' : 'month') &&
+    price.recurring.interval_count === 1
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS, getPlanById, type PaidPlanId, type PlanId, type BillingCycle } from '@/lib/plans'
+import { ANNUAL_BILLING_ENABLED, ANNUAL_DISCOUNT_PERCENT, SELLABLE_PLANS, getPlanById, type PaidPlanId, type PlanId, type BillingCycle } from '@/lib/plans'
 import { clearIntentCookie } from '@/lib/analytics/attribution'
 import { track } from '@/lib/analytics/client'
 import { getPlanDisplayName } from '@/lib/plan-display'
@@ -48,7 +48,14 @@ export interface ExtraPackRow {
   source_type:     'purchase' | 'referral'
 }
 
+export interface CurrentContract {
+  amount: number
+  billing: BillingCycle
+  grandfathered: boolean
+}
+
 interface BillingClientProps {
+  currentContract?: CurrentContract | null
   plan:    string
   balance: { plan: number; extra: number; total: number }
   /**
@@ -99,7 +106,7 @@ function daysUntil(date: string): number {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
 }
 
-export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, offerEligible, notice, canceled, resume }: BillingClientProps) {
+export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, offerEligible, notice, canceled, resume, currentContract }: BillingClientProps) {
   const router = useRouter()
   useEffect(() => { track('plans_viewed', { surface: 'app_billing' }) }, [])
   // Extras para qualquer plano pago (Starter incluso desde 2026-08-31).
@@ -313,11 +320,12 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
                 label="Ciclo de cobrança"
                 value={billing}
                 onChange={setBilling}
-                items={[{ value: 'monthly', label: 'Mensal' }, { value: 'annual', label: 'Anual' }]}
+                items={[{ value: 'monthly', label: 'Mensal' }, { value: 'annual', label: `Anual · ${ANNUAL_DISCOUNT_PERCENT}% de desconto` }]}
               />
             )}
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
               Plano atual: <strong style={{ color: 'var(--color-text-primary)' }}>{getPlanDisplayName(plan)}{isLegacyPlan && ` · ${legacyBadge}`}</strong>
+              {currentContract?.grandfathered && ' · Seu valor anterior está preservado enquanto esta assinatura permanecer ativa.'}
             </span>
             {canManage && (
               <button
@@ -392,8 +400,8 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
                     <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 4, fontWeight: 400 }}>nodes/mês</span>
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500, marginBottom: 4 }}>
-                    R$ {formatBRL(showOffer ? launchOfferPrice(price) : price)}
-                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>/mês</span>
+                    {current ? (currentContract ? `R$ ${formatBRL(currentContract.amount)}` : 'Consulte seu valor contratado') : `R$ ${formatBRL(showOffer ? launchOfferPrice(price) : price)}`}
+                    <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 400 }}>{current ? (currentContract ? (currentContract.billing === 'annual' ? '/ano' : '/mês') : '') : '/mês'}</span>
                     {showOffer && (
                       <span style={{
                         fontSize: 11, fontWeight: 400, marginLeft: 6,
@@ -409,9 +417,9 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
                       {' '}· depois R$ {formatBRL(price)}/mês
                     </div>
                   )}
-                  {billing === 'annual' && (
+                  {billing === 'annual' && !current && (
                     <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
-                      R$ {p.annualTotal.toLocaleString('pt-BR')} cobrado anualmente
+                      R$ {formatBRL(p.annualTotal)} cobrado uma vez por ano
                     </div>
                   )}
                   <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5, flex: 1, margin: '8px 0 16px' }}>

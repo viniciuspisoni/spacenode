@@ -45,7 +45,7 @@ describe('vitrine vs. legado', () => {
     const essence = PLANS.find(p => p.id === 'essence')
     expect(essence).toBeDefined()
     expect(essence!.legacy).toBeFalsy()
-    expect(essence!.monthlyPrice).toBe(99)
+    expect(essence!.monthlyPrice).toBe(149)
     expect(essence!.nodes).toBe(800)
   })
 
@@ -56,7 +56,7 @@ describe('vitrine vs. legado', () => {
     const studio = PLANS.find(p => p.id === 'studio')
     expect(studio).toBeDefined()
     expect(studio!.legacy).toBeFalsy()
-    expect(studio!.monthlyPrice).toBe(399)
+    expect(studio!.monthlyPrice).toBe(499)
     expect(studio!.nodes).toBe(4000)
   })
 
