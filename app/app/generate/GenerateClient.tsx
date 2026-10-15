@@ -4,7 +4,7 @@ import RenderComparisonImages from '@/components/generate/RenderComparisonImages
 import type { SavedRenderReview } from '@/lib/ai/fidelity/saved-render-review'
 import { FIXTURE_LIGHT_LABELS, resolveFixtureLights, type FixtureLights } from '@/lib/ai/fixture-lights'
 import RenderPreservationStatus from '@/components/generate/RenderPreservationStatus'
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { isModuleEnabled } from '@/lib/nav/modules-config'
@@ -25,6 +25,8 @@ import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import { track } from '@/lib/analytics/client'
 import { type OnboardingGoal } from '@/lib/onboarding'
+import { useRenderDraft, type DraftSnapshot } from '@/components/app/useRenderDraft'
+import { RenderDraftCard } from '@/components/app/RenderDraftCard'
 import GenerateGuide, {
   GUIDE_DISMISSED_KEY, type GuidePhase,
 } from '@/components/app/GenerateGuide'
@@ -335,6 +337,8 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   // Arquivo original selecionado (sobe INTEIRO via upload direto no Gerar) e
   // URL do input já hospedado pelo servidor (regenerações reusam sem re-upload).
   const [sourceFile,        setSourceFile]        = useState<File | null>(null)
+  const [referenceOrigin, setReferenceOrigin] = useState<'file' | 'existing_render' | 'example' | 'draft'>('file')
+  const onboardingAttemptRef = useRef(0)
   const [exampleReference, setExampleReference] = useState(false)
   const [exampleLoading, setExampleLoading] = useState(false)
   const exampleRequestRef = useRef<AbortController | null>(null)
@@ -396,6 +400,8 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   //    Só faz efeito quando há render anterior (anchor) — sem isso o modelo não
   //    tem referência fixa do "tudo o que deve ser preservado".
   const [refinementText, setRefinementText] = useState('')
+  const incomingHandoffRef = useRef(false)
+  const [hasIncomingHandoff, setHasIncomingHandoff] = useState(false)
 
   // A imagem em foco vira o papel de parede do app: é o que faz o painel de
   // vidro assumir a paleta do projeto, como no plugin. Enquanto não há
@@ -409,7 +415,9 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   useEffect(() => {
     const handoff = consumeHandoff('renderizar')
     if (!handoff) return
+    incomingHandoffRef.current = true
     const raf = requestAnimationFrame(() => {
+      setHasIncomingHandoff(true)
       const engine = handoff.settings?.engine
       const resolution = handoff.settings?.resolution
       if (isEngineId(engine)) {
@@ -603,15 +611,17 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   // MIMEs que a área render-source aceita (lib/storage/direct-upload).
   const DIRECT_UPLOAD_MIMES = ['image/jpeg', 'image/png', 'image/webp']
 
-  const loadImage = (file: File, source: 'file' | 'existing_render' | 'example' = 'file') => {
+  const loadImage = (file: File, source: 'file' | 'existing_render' | 'example' | 'draft' = 'file') => {
     if (!file.type.startsWith('image/')) return
     if (file.size > 15 * 1024 * 1024) { setError('Imagem muito grande. Máximo 15 MB.'); return }
     exampleRequestRef.current?.abort()
     exampleRequestRef.current = null
     setExampleLoading(false)
     setExampleReference(source === 'example')
+    setReferenceOrigin(source)
+    onboardingAttemptRef.current += 1
     // Explorar um exemplo não conta como envio de um projeto real no funil.
-    if (source !== 'example') track('render_reference_selected', { source })
+    if (source !== 'example' && source !== 'draft') track('render_reference_selected', { source })
     setOutputUrl(null); setError(null); setUseAnchor(true); setRefinementText('')
     setFidelityScore(null); setFidelityWarning(false); setShowDiff(false)
     setServerInputUrl(null); setBeforeAspect(null)
@@ -640,6 +650,33 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
     }
     reader.readAsDataURL(file)
   }
+
+  const draftSnapshot = useMemo<DraftSnapshot | null>(() => {
+    if (!sourceFile || exampleReference || outputUrl || selectedEngine === 'orion' || !['file', 'draft'].includes(referenceOrigin)) return null
+    return {
+      image: sourceFile, filename: sourceFile.name, lastModified: sourceFile.lastModified,
+      config: { projectType, segment, environment, lighting, fixtureLights, background, sceneElements,
+        selectedEngine, selectedResolution },
+      materials, materialRefs, direction: refinementText, goal: onboardingGoal,
+    }
+  }, [sourceFile, exampleReference, outputUrl, referenceOrigin, projectType, segment, environment,
+    lighting, fixtureLights, background, sceneElements, selectedEngine, selectedResolution,
+    materials, materialRefs, refinementText, onboardingGoal])
+
+  const draft = useRenderDraft({ userId, snapshot: draftSnapshot, onRestore: (saved, file) => {
+    // Explicit source/review/assistant handoffs and a newly selected file win.
+    if (imagePreview || initialSourceUrl || initialReview || incomingHandoffRef.current || exampleLoading) return false
+    loadImage(file, 'draft')
+    const c = saved.config
+    setProjectType(c.projectType); setSegment(c.segment); setEnvironment(c.environment)
+    setLighting(c.lighting); setFixtureLights(c.fixtureLights); setBackground(c.background)
+    setSceneElements(c.sceneElements); setSelectedEngine(c.selectedEngine)
+    lastPublicEngineRef.current = c.selectedEngine
+    setSelectedResolution(c.selectedResolution); setMaterials(saved.materials)
+    setMaterialRefs(saved.materialRefs); setRefinementText(saved.direction)
+    setOnboardingGoal(saved.goal); setGuideOpen(true)
+    return true
+  } })
 
   const handleExample = async () => {
     if (imagePreview || exampleRequestRef.current) return
@@ -777,6 +814,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
       const data: GenerateResult = await res.json()
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro na geração')
       setOutputUrl(data.outputUrl); setCredits(data.totalBalance ?? data.credits); setSliderPos(50)
+      void draft.complete()
       setCompletedHere(count => count + 1)
       setLastRenderId(data.renderId ?? null)
       setShowDiff(false)
@@ -905,6 +943,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   //    com nova imagem. Mantém os parâmetros (segmento, ambiente etc.) —
   //    só limpa o que pertence ao ciclo da imagem atual.
   const handleNewRender = () => {
+    void draft.complete()
     if (previewObjectUrlRef.current) {
       URL.revokeObjectURL(previewObjectUrlRef.current)
       previewObjectUrlRef.current = null
@@ -1019,6 +1058,16 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
     : outputUrl ? 'done'
     : imagePreview ? 'configure'
     : 'upload'
+
+  const journeyViews = useRef(new Set<string>())
+  useEffect(() => {
+    if (!guideOpen || exampleReference) return
+    const key = `${onboardingAttemptRef.current}:${generationKey}:${guidePhase}`
+    if (journeyViews.current.has(key)) return
+    journeyViews.current.add(key)
+    track('cta_clicked', { cta: 'onboarding_step_viewed', step: guidePhase,
+      entry: referenceOrigin, flow_version: '2026-10-15' })
+  }, [guideOpen, exampleReference, generationKey, guidePhase, referenceOrigin])
 
   const editSource = `/app/editar?source=${encodeURIComponent(outputUrl ?? '')}&source_type=render${lastRenderId ? `&source_id=${lastRenderId}` : ''}`
   const finalSource = `/app/finalizar?source=${encodeURIComponent(outputUrl ?? '')}`
@@ -1300,7 +1349,8 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
               ) : null}
 
               {lastRenderId && <RenderFeedback key={`feedback-${lastRenderId}`} renderId={lastRenderId}
-                outputUrl={outputUrl ?? undefined} offer={showPlanOffer ? { nodeCost } : undefined} />}
+                outputUrl={outputUrl ?? undefined} offer={showPlanOffer ? { nodeCost } : undefined}
+                onNextImage={() => { setGuideOpen(true); fileInputRef.current?.click() }} />}
 
               {/* Âncora: pílula de ESTADO (role=switch), não um campo de config. */}
               <div className="spn-pills">
@@ -1446,6 +1496,10 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
         {/* Dock: o CTA nunca some no scroll. */}
         <div className="spn-dock spn-glass spn-glass--chrome">
           {error && <div className="spn-error" style={{ marginBottom: 10 }}>{error}</div>}
+          {userId && draftSnapshot && <p className="spn-hint" role="status" style={{ margin: '0 0 10px', fontSize: 11 }}>
+            {draft.status === 'error' ? 'Não foi possível guardar o rascunho neste navegador. Você pode continuar e gerar normalmente.'
+              : draft.status === 'saved' ? 'Rascunho salvo neste navegador por até 7 dias.' : 'Guardando seu rascunho…'}
+          </p>}
 
           {exampleReference && <p className="spn-generate-assurance">Exemplo de exploração. Use sua imagem para gerar; explorar os ajustes não gasta Nodes.</p>}
           {imagePreview && !outputUrl && !loading && !exampleReference && (
@@ -1493,6 +1547,13 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
       {/* ── PALCO ── */}
       <div className="spn-glass spn-render-stage" style={S.stage}>
         <div style={S.stageBody}>
+
+          {!imagePreview && !initialSourceUrl && !initialReview && !hasIncomingHandoff && draft.available && (
+            <div style={S.guideSlot}>
+              <RenderDraftCard draft={draft.available} onResume={() => draft.resume(draft.available!)} onDiscard={() => void draft.discard()} />
+              {draft.status === 'error' && <p role="alert" className="spn-error">Não foi possível atualizar o rascunho. Tente novamente.</p>}
+            </div>
+          )}
 
           {guideOpen && (
             <div style={S.guideSlot}>

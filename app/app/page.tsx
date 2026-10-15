@@ -1,4 +1,5 @@
 import OnboardingJourney from '@/components/app/OnboardingJourney'
+import DashboardRenderDraft from '@/components/app/RenderDraftCard'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
@@ -158,6 +159,7 @@ export default async function AppPage() {
     <main style={{ flex: 1, overflowY: 'auto', padding: '0 32px 88px' }}>
       <DashboardViewPing />
       <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 34 }}>
+        <DashboardRenderDraft key={user.id} userId={user.id} />
         {totalRenders === 0 && <OnboardingJourney />}
 
         {/* ── 1 · Topo: saudação + CTA principal ───────────────────────────── */}

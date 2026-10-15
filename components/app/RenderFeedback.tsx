@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import PostResultPlanOffer from './PostResultPlanOffer'
-import { canOfferAfterValue } from '@/lib/onboarding'
+import ResultNextSteps from './ResultNextSteps'
 import type { RenderFeedbackInput, RenderFeedbackReason } from '@/lib/render-feedback'
 
 const REASONS: { id: RenderFeedbackReason; label: string }[] = [
@@ -13,10 +12,11 @@ const REASONS: { id: RenderFeedbackReason; label: string }[] = [
   { id: 'other', label: 'Outro motivo' },
 ]
 
-export function RenderFeedback({ renderId, offer, outputUrl }: {
+export function RenderFeedback({ renderId, offer, outputUrl, onNextImage }: {
   renderId: string
   offer?: { nodeCost: number }
   outputUrl?: string
+  onNextImage?: () => void
 }) {
   const [available, setAvailable] = useState(false)
   const [loadedRenderId, setLoadedRenderId] = useState<string | null>(null)
@@ -102,8 +102,8 @@ export function RenderFeedback({ renderId, offer, outputUrl }: {
         {feedback.useful ? 'Resultado útil confirmado. Agora você pode baixar ou continuar seu projeto.' : 'Resposta salva. Vamos ajudar você a chegar a um resultado útil.'}
       </p>}
       {error && <p role="alert" style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--color-error)' }}>{error}</p>}
-      {offer && canOfferAfterValue(true, feedback?.useful ?? null) &&
-        <PostResultPlanOffer renderId={renderId} nodeCost={offer.nodeCost} />}
+      {feedback?.useful === true && (outputUrl || offer || onNextImage) &&
+        <ResultNextSteps key={renderId} renderId={renderId} outputUrl={outputUrl} offer={offer} onNextImage={onNextImage} />}
     </section>
   )
 }

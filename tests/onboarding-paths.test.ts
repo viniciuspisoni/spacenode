@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ONBOARDING_PATHS, canOfferAfterValue } from '@/lib/onboarding'
+import { ONBOARDING_PATHS, canOfferAfterValue, canOfferForContinuation } from '@/lib/onboarding'
 
 describe('onboarding até primeiro valor', () => {
   it('encaminha imagens de modelo e fotos ao Renderizar com guia aberto', () => {
@@ -20,5 +20,12 @@ describe('onboarding até primeiro valor', () => {
   })
   it('não oferece nova assinatura a um pagante ou membro de equipe', () => {
     expect(canOfferAfterValue(false, true)).toBe(false)
+  })
+  it('oferece plano recorrente somente após utilidade e necessidade de continuar', () => {
+    expect(canOfferForContinuation(true, true, 'recurring')).toBe(true)
+    for (const need of [null, 'unknown', 'one_project'] as const) expect(canOfferForContinuation(true, true, need)).toBe(false)
+    expect(canOfferForContinuation(false, true, 'recurring')).toBe(false)
+    expect(canOfferForContinuation(true, null, 'recurring')).toBe(false)
+    expect(canOfferForContinuation(true, false, 'recurring')).toBe(false)
   })
 })
