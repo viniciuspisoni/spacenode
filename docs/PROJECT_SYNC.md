@@ -1,5 +1,11 @@
 # SPACENODE — Project Sync
 
+## Atualização de 16 de outubro de 2026
+
+Vinícius aprovou seguir com a evolução de qualidade da SpaceNode 2.0. A branch `codex/spacenode-2-visual-quality`, baseada no `main` `223bfef`, prepara direção fotográfica limitada à cena original, revisão manual opcional após gerar e download com formato identificado pelos bytes. O laboratório em outra área do projeto foi preservado. Escopo e critérios em [SPACENODE-2-QUALITY.md](SPACENODE-2-QUALITY.md).
+
+Esta mudança está em revisão e não foi publicada. Testes de instrução não demonstram ganho visual do modelo; a comparação de imagens e o aceite humano precedem a ativação. Catálogo, preços, Nodes e banco não foram alterados. As seções históricas abaixo descrevem o corte de maio e não substituem a leitura atual do código.
+
 > Fonte única de verdade para alinhamento entre agentes (Claude Code, Codex, ChatGPT, Gemini).
 > Toda decisão, estado e pendência do projeto deve partir daqui.
 >

@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-10-16 — Primeira evolução de qualidade da SpaceNode 2
+
+- Branch `codex/spacenode-2-visual-quality`, base `main` `223bfef`.
+- Direção de foto limitada aos elementos da referência, com cuidado específico para contexto neutro, luz e legibilidade de superfícies.
+- Revisão manual opcional com quatro pontos, comparador e atalhos de edição. Estado local reiniciado a cada resultado; não altera feedback nem certifica fidelidade.
+- Verificação estrutural apresentada como comparação de contornos.
+- Download preserva bytes e corrige MIME/extensão de imagens quando os metadados do CDN divergem; vídeos permanecem compatíveis.
+- 248 testes de fidelidade/download passaram, 2 testes pagos permaneceram desativados. Checagem TypeScript passou; lint dos arquivos alterados sem erros, com quatro avisos de imagens preexistentes no GenerateClient.
+- Build de produção passou com configurações locais sem credenciais reais. Prévia local conferiu marcação, alerta simultâneo, comparação, teclado, reinício em outra imagem e largura móvel de 390px sem rolagem horizontal. Não houve geração paga, uso de dados de clientes, alteração de Nodes ou publicação. A comparação visual de modelo ainda é necessária.
+- Referência de escopo e próximo experimento em `docs/SPACENODE-2-QUALITY.md`.
+
+---
+
 ## 2026-05-23 — PR #64 aberto: SPACES v2 sincroniza código ao schema vivo
 
 - **Agente responsável:** Claude Code
