@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { fal } from '@fal-ai/client'
+import sharp from 'sharp'
 import { getRequestUser } from '@/lib/auth/request-user'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { DIRECT_UPLOAD_AREAS, downloadDirectUpload } from '@/lib/storage/direct-upload'
@@ -8,7 +9,10 @@ import { refundNodes } from '@/lib/billing/refund-nodes'
 import { APRESENTAR_TOOLS } from '@/lib/apresentar/config'
 import { buildHumanizedPlanPrompt } from '@/lib/apresentar/prompts'
 import { getFalEndpoint, getNodesCost, type EngineId, type Resolution } from '@/lib/engines'
-import { generateImage, type GenerateImageResult } from '@/lib/ai/image-provider'
+import { generateImage, seedreamRoute, type GenerateImageResult } from '@/lib/ai/image-provider'
+import { seedreamCheapSize } from '@/lib/ai/seedream-size'
+import { readHumanizedPlan, composePlanLabels, type PlanRead } from '@/lib/apresentar/plan-reader'
+import { measurePlanLineRecall, type PlanLineScore } from '@/lib/apresentar/plan-line-score'
 import { computeGeometryScore, buildEdgeMapPng, type GeometryScoreBreakdown } from '@/lib/ai/fidelity/geometry-score'
 import { getFidelityAttemptParams } from '@/lib/ai/fidelity/render-only'
 import { fetchStorageBuffer } from '@/lib/storage/fetch'
@@ -27,9 +31,9 @@ const FAL_TIMEOUT_MS = 90_000
 
 // ── Gate de fidelidade da planta (envs com defaults; espelha o render_only) ──
 //
-//   HUMANIZED_PLAN_FIDELITY_GATE  '0' desliga validação+retry (rollback rápido)
+//   HUMANIZED_PLAN_FIDELITY_GATE  '1' liga gate legado (default off: não calibrado para line-art)
 //   HUMANIZED_PLAN_MIN_SCORE      limite do geometry score (default 0.50)
-//   HUMANIZED_PLAN_MAX_ATTEMPTS   total de tentativas (default 2, cap 3)
+//   HUMANIZED_PLAN_MAX_ATTEMPTS   total de tentativas quando ligado (default 2, cap 3)
 //
 // Motivação (feedback de beta — Muda, "leitura incorreta"): a planta humanizada
 // saía "bem diferente" da planta técnica original. Mesmo contrato do
@@ -40,7 +44,7 @@ function getPlanFidelityConfig(): { enabled: boolean; minScore: number; maxAttem
   const rawScore    = Number(process.env.HUMANIZED_PLAN_MIN_SCORE)
   const rawAttempts = Number(process.env.HUMANIZED_PLAN_MAX_ATTEMPTS)
   return {
-    enabled:     process.env.HUMANIZED_PLAN_FIDELITY_GATE !== '0',
+    enabled:     process.env.HUMANIZED_PLAN_FIDELITY_GATE === '1',
     minScore:    Number.isFinite(rawScore) && rawScore > 0 && rawScore < 1 ? rawScore : 0.5,
     maxAttempts: Number.isFinite(rawAttempts) && rawAttempts >= 1 ? Math.min(Math.floor(rawAttempts), 3) : 2,
   }
@@ -128,10 +132,10 @@ export async function POST(req: NextRequest) {
     if (!imageFile) {
       return NextResponse.json({ error: 'Imagem obrigatória' }, { status: 400 })
     }
-    if (!VALID_PROJECT_TYPES.includes(projectType as HumanizedPlanProjectType)) {
+    if (projectType !== null && !VALID_PROJECT_TYPES.includes(projectType as HumanizedPlanProjectType)) {
       return NextResponse.json({ error: 'Tipo de projeto inválido' }, { status: 400 })
     }
-    if (!VALID_STYLES.includes(style as HumanizedPlanStyle)) {
+    if (style !== null && !VALID_STYLES.includes(style as HumanizedPlanStyle)) {
       return NextResponse.json({ error: 'Estilo inválido' }, { status: 400 })
     }
     if (!VALID_LEVELS.includes(level as HumanizedPlanLevel)) {
@@ -140,7 +144,7 @@ export async function POST(req: NextRequest) {
 
     let options: HumanizedPlanOptions
     try {
-      options = optionsRaw ? JSON.parse(optionsRaw) : {}
+      options = optionsRaw ? JSON.parse(optionsRaw) : { addFurniture: true, addVegetation: true, applyFloorTextures: true, addSoftShadows: true, preserveLines: true, addRoomLabels: true }
     } catch {
       return NextResponse.json({ error: 'Opções inválidas' }, { status: 400 })
     }
@@ -148,9 +152,15 @@ export async function POST(req: NextRequest) {
     if (!TOOL.engine || !TOOL.resolution) {
       return NextResponse.json({ error: 'Ferramenta não configurada' }, { status: 500 })
     }
-    const engine     = TOOL.engine     as EngineId
+    const originalBuffer = Buffer.from(await imageFile.arrayBuffer())
+    const dimensions = await sharp(originalBuffer).metadata()
+    const cheapSize = seedreamCheapSize(dimensions.width, dimensions.height)
+    // Opt-in pilot only. Without the direct low-tier Ark route, keep legacy.
+    const useV2 = process.env.HUMANIZED_PLAN_V2 === '1' &&
+      seedreamRoute() === 'ark' && !!process.env.ARK_API_KEY?.trim() && !!cheapSize
+    const engine = (useV2 ? 'quasar' : TOOL.engine) as EngineId
     const resolution = TOOL.resolution as Resolution
-    nodesToCharge    = getNodesCost(engine, resolution)
+    nodesToCharge = getNodesCost(engine, resolution)
     const falEndpoint = getFalEndpoint(engine)
 
     // ── Débito atômico ────────────────────────────────────────────────────────
@@ -170,18 +180,26 @@ export async function POST(req: NextRequest) {
     }
     debited = true
 
-    // ── Geração com gate de fidelidade (retry ladder) ─────────────────────────
+    // ── V2: tentativa única com telemetria; legado: gate opt-in ──────────────
+    inputUrl = await fal.storage.upload(imageFile)
+    let planRead: PlanRead | null = null
+    if (useV2 || !projectType) {
+      try {
+        planRead = await readHumanizedPlan(inputUrl)
+        if (!projectType) projectType = planRead.projectType
+      } catch (readError) {
+        console.warn('[apresentar/humanized-plan] leitura indisponível:', (readError as Error).message)
+      }
+    }
+    projectType ??= 'auto'
+    style ??= 'imobiliario_premium'
     const promptInput = {
-      projectType: projectType as HumanizedPlanProjectType,
-      style:       style       as HumanizedPlanStyle,
-      level:       level       as HumanizedPlanLevel,
-      options,
+      projectType: projectType as HumanizedPlanProjectType | 'auto',
+      style: style as HumanizedPlanStyle,
+      level: level as HumanizedPlanLevel,
+      options: useV2 ? { ...options, addRoomLabels: false } : options,
       additionalInstructions,
     }
-
-    inputUrl = await fal.storage.upload(imageFile)
-    // Buffer do original direto do upload — sem re-fetch.
-    const originalBuffer = Buffer.from(await imageFile.arrayBuffer())
 
     console.log('[apresentar/humanized-plan] engine    :', engine, '→', falEndpoint)
     console.log('[apresentar/humanized-plan] resolution:', resolution, '→', nodesToCharge, 'nodes')
@@ -190,18 +208,51 @@ export async function POST(req: NextRequest) {
     // Vega (nano-banana-pro/edit): resolution param 1K/2K/4K
     const resolutionMap: Record<Resolution, string> = { hd: '1K', '2k': '2K', '4k': '4K' }
 
-    const gate = getPlanFidelityConfig()
-    const maxAttempts = gate.enabled ? gate.maxAttempts : 1
-
-    let edgeMapUrl: string | null = null
     let prompt = ''
     let best: { gen: GenerateImageResult; prompt: string; score: number | null } | null = null
     const attemptLogs: {
       attempt: number; provider: string; provider_model: string | null
       temperature: number; edge_map_used: boolean; duration_ms: number
-      geometry: GeometryScoreBreakdown | null; score_error?: string
+      geometry: GeometryScoreBreakdown | null; line_art?: PlanLineScore; score_error?: string
     }[] = []
 
+    if (useV2) {
+      prompt = buildHumanizedPlanPrompt(promptInput)
+      const gen = await generateImage({
+        falEndpoint,
+        falInput: {
+          prompt,
+          image_urls: [inputUrl],
+          image_size: cheapSize!,
+          num_images: 1,
+          output_format: 'png',
+        },
+        timeoutMs: 180_000,
+        context: 'apresentar/humanized-plan-v2',
+        deliver: { kind: 'url', userId: user.id, area: 'apresentar' },
+        allowFallback: false,
+      })
+      if (!gen.images[0]?.url) throw new Error('Provider não retornou imagem')
+      let lineArt: PlanLineScore | undefined
+      let scoreError: string | undefined
+      try {
+        lineArt = await measurePlanLineRecall(originalBuffer, await fetchStorageBuffer(gen.images[0].url))
+      } catch (error) {
+        scoreError = (error as Error).message
+      }
+      // Diagnostic only: no score-triggered retry until calibrated against real plans.
+      attemptLogs.push({
+        attempt: 1, provider: gen.provider, provider_model: gen.providerModel,
+        temperature: 0, edge_map_used: false, duration_ms: gen.latencyMs,
+        geometry: null, ...(lineArt ? { line_art: lineArt } : {}),
+        ...(scoreError ? { score_error: scoreError } : {}),
+      })
+      best = { gen, prompt, score: lineArt?.recall ?? null }
+    } else {
+      const gate = getPlanFidelityConfig()
+    const maxAttempts = gate.enabled ? gate.maxAttempts : 1
+
+    let edgeMapUrl: string | null = null
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const params = getFidelityAttemptParams(attempt)
 
@@ -299,12 +350,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    }
+
     if (!best) throw new Error('nenhuma tentativa de geração concluída')
     const gen = best.gen
     prompt = best.prompt
 
     outputUrl = gen.images[0]?.url
     if (!outputUrl) throw new Error('Provider não retornou imagem')
+    if (useV2 && planRead && dimensions.width && dimensions.height) {
+      try {
+        outputUrl = await composePlanLabels(outputUrl, dimensions.width, dimensions.height, planRead, user.id)
+      } catch (labelError) {
+        console.warn('[apresentar/humanized-plan] labels indisponíveis:', (labelError as Error).message)
+      }
+    }
     const falRequestId = gen.requestId
     console.log('[apresentar/humanized-plan] outputUrl :', outputUrl, '| provider:', gen.provider, '| req:', falRequestId)
 
@@ -317,6 +377,8 @@ export async function POST(req: NextRequest) {
       level,
       options,
       additionalInstructions,
+      harness: useV2 ? 'v2_ark_low_tier' : 'legacy',
+      estimated_image_cost_usd: useV2 ? 0.045 : null, // estimate, not provider invoice
       generation: {
         provider:       gen.provider,
         provider_model: gen.providerModel,
@@ -326,8 +388,8 @@ export async function POST(req: NextRequest) {
       },
       // Observabilidade do gate de fidelidade da planta (attempts + scores).
       fidelity: {
-        gate_enabled:  getPlanFidelityConfig().enabled,
-        min_score:     getPlanFidelityConfig().minScore,
+        gate_enabled:  useV2 ? false : getPlanFidelityConfig().enabled,
+        min_score:     useV2 ? null : getPlanFidelityConfig().minScore,
         final_score:   best.score,
         attempts:      attemptLogs,
       },
@@ -376,6 +438,7 @@ export async function POST(req: NextRequest) {
       planBalance:      balance?.plan_balance  ?? 0,
       extraBalance:     balance?.lumen_balance ?? 0,
       nodesCharged:     nodesToCharge,
+      format:           useV2 ? 'png' : 'jpg',
       prompt,
     })
 
