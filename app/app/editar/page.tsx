@@ -85,9 +85,9 @@ export default async function EditarPage({
     )) as FinalizeProjectSummary[]
 
     return (
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {guided && !recovery && <EditOnboardingGuide />}
-        <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex' }}>
           <FinalizeEditor
             key={recovery ? `${recovery.renderId}:${recovery.reason}` : source ?? 'new'}
             savedProjects={savedProjects}
