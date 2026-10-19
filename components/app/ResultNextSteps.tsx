@@ -14,11 +14,12 @@ const NEEDS: { id: ContinuationNeed; label: string }[] = [
 ]
 
 /** Mounted only after the authenticated feedback confirms usefulness. */
-export default function ResultNextSteps({ renderId, outputUrl, offer, onNextImage }: {
+export default function ResultNextSteps({ renderId, outputUrl, offer, onNextImage, editJobId }: {
   renderId: string
   outputUrl?: string
   offer?: { nodeCost: number }
   onNextImage?: () => void
+  editJobId?: string
 }) {
   const [need, setNeed] = useState<ContinuationNeed | null>(null)
   const key = `spn:render-continuation:v1:${renderId}`
@@ -39,7 +40,7 @@ export default function ResultNextSteps({ renderId, outputUrl, offer, onNextImag
   return <div className={styles.nextSteps} aria-label="Próximo passo do projeto">
     <strong>Qual é seu próximo passo?</strong>
     <div className={styles.tipActions}>
-      {outputUrl && <Link className="spn-pill" href={`/app/editar?source=${encodeURIComponent(outputUrl)}&source_type=render&source_id=${encodeURIComponent(renderId)}&onboarding=1`}
+      {outputUrl && <Link className="spn-pill" href={`/app/editar?source=${encodeURIComponent(outputUrl)}&source_type=${editJobId ? 'edit' : 'render'}&source_id=${encodeURIComponent(editJobId ?? renderId)}&onboarding=1`}
         onClick={() => track('cta_clicked', { cta: 'onboarding_next_step', action: 'edit', render_id: renderId })}>Ajustar esta imagem →</Link>}
       {onNextImage && <button type="button" className="spn-pill" onClick={() => {
         track('cta_clicked', { cta: 'onboarding_next_step', action: 'next_image', render_id: renderId })

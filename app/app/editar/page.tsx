@@ -31,6 +31,8 @@ import { assertSafeImageUrl } from '@/lib/edit-v3/ssrf'
 import { nodesForEdit } from '@/lib/edit-v4/pricing'
 import { editV4Enabled, editV4Route } from '@/lib/edit-v4/flags'
 import type { FinalizeProjectSummary } from '@/lib/finalizar/types'
+import { loadOwnRenderRecovery } from '@/lib/onboarding/render-recovery-server'
+import RenderRecoveryGuide from '@/components/app/RenderRecoveryGuide'
 
 /** `?source=` só é aceito se apontar para uma origem da casa — a MESMA
  *  allowlist que a rota de edição usa. Sem isto, um link montado por terceiro
@@ -60,6 +62,11 @@ export default async function EditarPage({
   const balance = payerBalance.totalBalance
   const params = await searchParams
   const guided = params.onboarding === '1'
+  const recovery = await loadOwnRenderRecovery(supabase, user.id, params.recovery, params.reason)
+  // A recovery always loads this owner's persisted output, never a URL supplied in the link.
+  const source = recovery?.outputUrl ?? (params.recovery ? null : safeSource(params.source))
+  const showPlanOffer = payerBalance.planId === 'free' && !payerBalance.pooled
+  if (recovery?.reason === 'geometry') return <main style={{ flex: 1, overflowY: 'auto' }}><RenderRecoveryGuide recovery={recovery} /></main>
 
   // ── Editar unificado ──────────────────────────────────────────────────────
   // Sai antes do fork antigo de propósito: é o único que precisa do papel de
@@ -79,11 +86,14 @@ export default async function EditarPage({
 
     return (
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {guided && <EditOnboardingGuide />}
+        {guided && !recovery && <EditOnboardingGuide />}
         <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
           <FinalizeEditor
+            key={recovery ? `${recovery.renderId}:${recovery.reason}` : source ?? 'new'}
             savedProjects={savedProjects}
-            initialSourceUrl={safeSource(params.source)}
+            initialSourceUrl={source}
+            recovery={recovery}
+            showPlanOffer={showPlanOffer}
             initialBalance={balance}
             nodesPerEdit={nodesForEdit({ provider: editV4Route() })}
             aiEnabled={editV4Enabled()}
@@ -99,9 +109,9 @@ export default async function EditarPage({
 
   return (
     <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
-      {guided && <EditOnboardingGuide />}
+      {guided && !recovery && <EditOnboardingGuide />}
       {useV3 ? (
-        <EditV3Flow initialBalance={balance} initialSourceUrl={safeSource((await searchParams).source)} />
+        <EditV3Flow key={recovery ? `${recovery.renderId}:${recovery.reason}` : source ?? 'new'} initialBalance={balance} initialSourceUrl={source} recovery={recovery} showPlanOffer={showPlanOffer} />
       ) : useClean ? (
         <EditCleanFlow initialBalance={balance} />
       ) : useV2 ? (
