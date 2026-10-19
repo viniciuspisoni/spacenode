@@ -27,6 +27,11 @@ import { track } from '@/lib/analytics/client'
 import { type OnboardingGoal } from '@/lib/onboarding'
 import { useRenderDraft, type DraftSnapshot } from '@/components/app/useRenderDraft'
 import { RenderDraftCard } from '@/components/app/RenderDraftCard'
+import FirstImageRecommendation from '@/components/app/FirstImageRecommendation'
+import ReferencePreparation from '@/components/app/ReferencePreparation'
+import { useReferenceImage } from '@/components/app/useReferenceImage'
+import { FIRST_IMAGE_VERSION, smallReference, type FirstImageRecommendation as Recommendation } from '@/lib/onboarding/first-image'
+import firstImageStyles from '@/components/app/FirstImage.module.css'
 import GenerateGuide, {
   GUIDE_DISMISSED_KEY, type GuidePhase,
 } from '@/components/app/GenerateGuide'
@@ -337,6 +342,11 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   // Arquivo original selecionado (sobe INTEIRO via upload direto no Gerar) e
   // URL do input já hospedado pelo servidor (regenerações reusam sem re-upload).
   const [sourceFile,        setSourceFile]        = useState<File | null>(null)
+  const referenceImage = useReferenceImage(sourceFile)
+  const [referenceConverting, setReferenceConverting] = useState(false)
+  const referenceRevisionRef = useRef(0)
+  const [uncroppedFile, setUncroppedFile] = useState<File | null>(null)
+  const [firstImageSheet, setFirstImageSheet] = useState<'recommendation' | 'reference' | null>(null)
   const [referenceOrigin, setReferenceOrigin] = useState<'file' | 'existing_render' | 'example' | 'draft'>('file')
   const onboardingAttemptRef = useRef(0)
   const [exampleReference, setExampleReference] = useState(false)
@@ -606,17 +616,14 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   useEffect(() => () => {
     if (previewObjectUrlRef.current) URL.revokeObjectURL(previewObjectUrlRef.current)
     exampleRequestRef.current?.abort()
+    referenceRevisionRef.current += 1
   }, [])
 
   // MIMEs que a área render-source aceita (lib/storage/direct-upload).
   const DIRECT_UPLOAD_MIMES = ['image/jpeg', 'image/png', 'image/webp']
 
-  const loadImage = (file: File, source: 'file' | 'existing_render' | 'example' | 'draft' = 'file') => {
-    if (!file.type.startsWith('image/')) return
-    if (file.size > 15 * 1024 * 1024) { setError('Imagem muito grande. Máximo 15 MB.'); return }
-    exampleRequestRef.current?.abort()
-    exampleRequestRef.current = null
-    setExampleLoading(false)
+  const commitReference = (file: File, source: 'file' | 'existing_render' | 'example' | 'draft') => {
+    setFirstImageSheet(null); setUncroppedFile(null)
     setExampleReference(source === 'example')
     setReferenceOrigin(source)
     onboardingAttemptRef.current += 1
@@ -626,29 +633,66 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
     setFidelityScore(null); setFidelityWarning(false); setShowDiff(false)
     setServerInputUrl(null); setBeforeAspect(null)
     setScale(1); setPan({ x: 0, y: 0 })
+    setSourceFile(file)
+    setPreviewFromFile(file)
+  }
+  const loadImage = (file: File, source: 'file' | 'existing_render' | 'example' | 'draft' = 'file') => {
+    if (loading) return
+    if (!file.type.startsWith('image/')) { setError('Escolha um arquivo de imagem.'); return }
+    if (file.size > 15 * 1024 * 1024) { setError('Imagem muito grande. Máximo 15 MB.'); return }
+    const revision = ++referenceRevisionRef.current
+    exampleRequestRef.current?.abort()
+    exampleRequestRef.current = null
+    setExampleLoading(false); setReferenceConverting(false); setFirstImageSheet(null)
     if (DIRECT_UPLOAD_MIMES.includes(file.type)) {
       // Caminho principal: o arquivo ORIGINAL sobe inteiro no Gerar (upload
       // direto). Nada de canvas/downscale no client.
-      setSourceFile(file)
-      setPreviewFromFile(file)
+      commitReference(file, source)
       return
     }
     // Formato fora do upload direto (ex.: HEIC/AVIF quando o browser decoda):
     // converte pra JPEG em resolução cheia (teto 8192) — nunca mais o
     // downscale de 2048 px que este fluxo aplicava a todo upload.
     const reader = new FileReader()
+    setReferenceConverting(true)
     reader.onload = async (e) => {
       try {
         const dataUrl = await compressImage(e.target?.result as string, 8192, 0.95)
         const blob = await (await fetch(dataUrl)).blob()
         const converted = new File([blob], 'input.jpg', { type: 'image/jpeg' })
-        setSourceFile(converted)
-        setPreviewFromFile(converted)
+        if (referenceRevisionRef.current === revision) commitReference(converted, source)
       } catch {
-        setError('Não foi possível processar essa imagem. Tente outro arquivo.')
-      }
+        if (referenceRevisionRef.current === revision) setError('Não foi possível processar essa imagem. Tente outro arquivo. A referência anterior foi mantida.')
+      } finally { if (referenceRevisionRef.current === revision) setReferenceConverting(false) }
     }
+    reader.onerror = () => { if (referenceRevisionRef.current === revision) { setReferenceConverting(false); setError('Não foi possível ler essa imagem. Tente outro arquivo.') } }
     reader.readAsDataURL(file)
+  }
+
+  const replacePreparedReference = (file: File, action: 'crop' | 'undo') => {
+    if (loading || !sourceFile) return
+    if (action === 'crop') setUncroppedFile(prev => prev ?? sourceFile)
+    else setUncroppedFile(null)
+    referenceRevisionRef.current += 1
+    setSourceFile(file); setPreviewFromFile(file); setServerInputUrl(null)
+    setBeforeAspect(null); setScale(1); setPan({ x: 0, y: 0 }); setError(null); setFirstImageSheet(null)
+    track('cta_clicked', { cta: action === 'crop' ? 'onboarding_reference_cropped' : 'onboarding_reference_crop_undone', example: exampleReference, flow_version: FIRST_IMAGE_VERSION })
+  }
+
+  const applyFirstImageRecommendation = (recommendation: Recommendation) => {
+    if (loading) return
+    const c = recommendation.config
+    setProjectType(c.projectType); setSegment(c.segment); setEnvironment(c.environment)
+    setLighting(c.lighting); setFixtureLights(c.fixtureLights); setBackground(c.background)
+    setSceneElements(c.sceneElements); setSelectedEngine(c.selectedEngine)
+    lastPublicEngineRef.current = c.selectedEngine
+    setSelectedResolution(c.selectedResolution); setOnboardingGoal(recommendation.goal)
+    if (recommendation.materialChange) {
+      const change = recommendation.materialChange
+      setMaterials(prev => ({ ...prev, [change.field]: change.value }))
+    }
+    setError(null); setFirstImageSheet(null)
+    track('cta_clicked', { cta: 'onboarding_recommendation_applied', goal: recommendation.goal, project_type: c.projectType, example: exampleReference, flow_version: FIRST_IMAGE_VERSION })
   }
 
   const draftSnapshot = useMemo<DraftSnapshot | null>(() => {
@@ -715,18 +759,22 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
     if (sourceLoadedRef.current || !initialSourceUrl || imagePreview) return
     if (!/^https:\/\//i.test(initialSourceUrl)) return
     sourceLoadedRef.current = true
+    const request = new AbortController()
+    const revision = referenceRevisionRef.current
     ;(async () => {
       try {
-        const res = await fetch(initialSourceUrl)
+        const res = await fetch(initialSourceUrl, { signal: request.signal })
         if (!res.ok) throw new Error()
         const blob = await res.blob()
         if (!blob.type.startsWith('image/')) throw new Error()
         const ext = blob.type.split('/')[1] || 'jpg'
+        if (request.signal.aborted || referenceRevisionRef.current !== revision) return
         loadImage(new File([blob], `reutilizar.${ext}`, { type: blob.type }), 'existing_render')
       } catch {
-        setError('Não foi possível carregar a imagem selecionada.')
+        if (!request.signal.aborted && referenceRevisionRef.current === revision) setError('Não foi possível carregar a imagem selecionada.')
       }
     })()
+    return () => { request.abort(); sourceLoadedRef.current = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSourceUrl])
 
@@ -752,6 +800,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
     resolutionOverride?: Resolution,
     opts?: { structuralBoost?: boolean },
   ) => {
+    if (loading || referenceConverting || firstImageSheet || referenceImage.status === 'reading' || referenceImage.status === 'error') return
     // O exemplo é apenas uma exploração de ajustes, nunca uma geração paga.
     if (exampleReference) { fileInputRef.current?.click(); return }
     if (!imagePreview || (!sourceFile && !serverInputUrl)) { setError('Faça upload de uma imagem primeiro.'); return }
@@ -943,6 +992,9 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   //    com nova imagem. Mantém os parâmetros (segmento, ambiente etc.) —
   //    só limpa o que pertence ao ciclo da imagem atual.
   const handleNewRender = () => {
+    if (loading) return
+    referenceRevisionRef.current += 1
+    setFirstImageSheet(null); setUncroppedFile(null); setReferenceConverting(false)
     void draft.complete()
     if (previewObjectUrlRef.current) {
       URL.revokeObjectURL(previewObjectUrlRef.current)
@@ -1535,7 +1587,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
                 type="button"
                 className="spn-cta"
                 onClick={() => handleGenerate()}
-                disabled={loading || !imagePreview}
+                disabled={loading || !imagePreview || referenceConverting || referenceImage.status === 'reading' || referenceImage.status === 'error' || !!firstImageSheet}
               >
                 {ctaLabel}
               </button>
@@ -1582,6 +1634,10 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
                 }}
                 configuration={{ cena: `${projectType === 'interior' ? 'Interior' : 'Exterior'} · ${cenaSummary}`, luz: luzSummary, materiais: materiaisSummary, saida: saidaSummary }}
                 reviewKey={lastRenderId ?? outputUrl}
+                onRecommend={!loading && !outputUrl && referenceImage.status === 'ready' && !referenceConverting ? () => {
+                  setSheet(null); setFirstImageSheet('recommendation')
+                  track('cta_clicked', { cta: 'onboarding_recommendation_opened', example: exampleReference, flow_version: FIRST_IMAGE_VERSION })
+                } : undefined}
               />
             </div>
           )}
@@ -1602,6 +1658,27 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
               </button>
             )}
           </div>
+
+          {imagePreview && !outputUrl && !loading && <div className={firstImageStyles.referenceBar}>
+            {referenceImage.size && <span>{referenceImage.size.width} × {referenceImage.size.height} px</span>}
+            {(referenceConverting || referenceImage.status === 'reading') && <span role="status">Verificando a referência…</span>}
+            {sourceFile && referenceImage.status === 'ready' && !referenceConverting && <>
+              <button type="button" className="spn-pill" onClick={() => {
+                setSheet(null); setFirstImageSheet('reference')
+                track('cta_clicked', { cta: 'onboarding_reference_preparation_opened', example: exampleReference, flow_version: FIRST_IMAGE_VERSION })
+              }}>Preparar referência</button>
+              {uncroppedFile && <button type="button" className="spn-pill" onClick={() => replacePreparedReference(uncroppedFile, 'undo')}>Desfazer recorte</button>}
+              {!guideOpen && <button type="button" className="spn-pill" onClick={() => { setSheet(null); setFirstImageSheet('recommendation') }}>Configuração recomendada</button>}
+            </>}
+          </div>}
+          {!imagePreview && referenceConverting && <p role="status" className={firstImageStyles.warning}>Preparando a imagem para abrir…</p>}
+          {imagePreview && !outputUrl && !referenceConverting && referenceImage.status === 'error' && <p role="alert" className={firstImageStyles.warning}>Não foi possível abrir esta imagem. Envie outro arquivo JPG, PNG ou WebP para continuar.</p>}
+          {imagePreview && !outputUrl && referenceImage.size && smallReference(referenceImage.size) && <p className={firstImageStyles.warning}>Esta referência tem poucos pixels ({referenceImage.size.width} × {referenceImage.size.height}). Se puder, exporte uma vista maior do projeto. Você pode continuar com esta imagem.</p>}
+          {firstImageSheet === 'recommendation' && !loading && <FirstImageRecommendation projectType={projectType} goal={onboardingGoal} materials={materials} materialRefs={materialRefs}
+            current={{ scene: `${projectType === 'interior' ? 'Interior' : 'Exterior'} · ${cenaSummary}`, lighting: luzSummary, output: saidaSummary, elements: sceneElements.length }}
+            onClose={() => setFirstImageSheet(null)} onApply={applyFirstImageRecommendation} />}
+          {firstImageSheet === 'reference' && !loading && sourceFile && imagePreview && referenceImage.size && <ReferencePreparation file={sourceFile} previewUrl={imagePreview} size={referenceImage.size}
+            onClose={() => setFirstImageSheet(null)} onApply={file => replacePreparedReference(file, 'crop')} />}
 
           {/* Mantém o seletor disponível durante a prévia. Cancelar a troca
               preserva a imagem atual; limpar value permite escolher o mesmo arquivo. */}
