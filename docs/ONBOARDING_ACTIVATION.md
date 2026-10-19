@@ -102,3 +102,58 @@ Experimento prioritário: comparar a proporção de novas contas externas com re
 - Build de produção com webpack aprovado. O Turbopack local rejeita o compartilhamento de dependências por link entre checkouts; o código compila com dependências normais e webpack. As variáveis públicas necessárias à pré-renderização foram fornecidas só ao processo de build.
 
 A prévia verifica interfaces e contratos com respostas de exemplo. Não cria uma geração paga, sessão OAuth ou compra real e não comprova ganho de conversão; essa leitura depende das coortes após a publicação.
+
+## Ajuste guiado após “Ainda não” — 19/10/2026
+
+O link de recuperação transporta apenas o id do render e um motivo conhecido.
+A página autentica e carrega a saída persistida do próprio usuário. URLs enviadas
+junto de um link de recuperação não substituem essa imagem. Vídeo, ampliação,
+teste interno e render incompleto não são elegíveis.
+
+- Luz: sugestões editáveis para luz natural, clarear, suavizar ou aquecer.
+- Materiais: superfície/seleção e descrição/amostra preparam o pedido real.
+  Preparar é opcional: o usuário também pode escrever diretamente no editor.
+- Geometria: comparação entre entrada e saída, checklist local e retorno à
+  revisão no Renderizar. Se a configuração antiga não puder ser restaurada,
+  a referência original continua disponível pelo parâmetro source. Nenhuma
+  geração é iniciada pelo link ou pelo checklist.
+- Outros motivos: orientação para um ajuste por vez, com pedido livre.
+
+Os editores V4 (produção) e V3 mostram uma revisão antes da execução: ação,
+pedido, área/amostra, configurações de precisão e custo vigente em Nodes.
+Cancelar não envia a edição. No V3, a cotação precisa corresponder ao pedido
+atual; uma cotação antiga não autoriza a confirmação. No V4, o preço vem do
+servidor, pelo mesmo catálogo da execução. No fluxo guiado, a expansão automática
+de área começa desligada; se o usuário a habilitar, a revisão informa isso.
+O V4 também usa trava síncrona contra duplo envio. Uma nova imagem encerra a
+associação da recuperação. No celular, o V4 guiado dispõe imagem e controles
+em sequência, com rolagem; os demais acessos mantêm a apresentação existente.
+
+Após uma edição bem-sucedida com job persistido, a pergunta continua exatamente
+“Este render serviu para o seu projeto?”, com Sim / Ainda não e motivos opcionais.
+A avaliação original em render_feedback permanece intacta. O endpoint autenticado
+`/api/renders/:renderId/recovery/:jobId/feedback` verifica dono, conclusão e a
+cadeia de imagens entre render e edição (até os 100 jobs concluídos mais recentes
+desse dono desde o render). Jobs de outra pessoa, sem saída ou sem vínculo são
+recusados. Sem job persistido, a edição permanece utilizável e a avaliação não
+é apresentada como confirmada.
+
+As respostas são registradas no mecanismo first-party existente,
+marketing.acquisition_events, como result_approved/result_rejected, com objeto
+metadata.recovery_feedback (render_id, job_id, useful, reason, nodes_cost,
+charged), feature editar e flow_version 2026-10-19. O objeto aninhado é exclusivo
+da rota; o coletor público aceita somente propriedades escalares. A gravação
+precisa confirmar persistência antes de a interface confirmar a resposta. GET
+recupera a última resposta desse dono/render/job. Não há migração de schema.
+
+Os eventos de navegação/preparo usam cta_clicked e os identificadores
+onboarding_recovery_started, onboarding_recovery_viewed e
+onboarding_recovery_prepared. Eles não comprovam utilidade. O gasto vem do job
+do servidor, não do número mostrado pelo cliente. Para analisar recuperação,
+considere a última resposta por render_id/job_id, separe versões, tráfego interno
+e origem/coorte, e cruze com a avaliação negativa original; silêncio continua
+com utilidade desconhecida. Não somar cada troca de resposta como pessoa nova.
+
+Somente uma resposta útil salva permite os próximos passos. A oferta continua
+restrita à conta gratuita individual elegível e à necessidade mensal declarada.
+Preço vem do catálogo vigente; não há cobrança nem assinatura automática.

@@ -55,6 +55,11 @@ import { EditToolRail } from './EditToolRail'
 import { GeometryPanel } from './panels/GeometryPanel'
 import { ElementsPanel } from './panels/ElementsPanel'
 import { HistoryPanel } from './panels/HistoryPanel'
+import RenderRecoveryGuide from '@/components/app/RenderRecoveryGuide'
+import RecoveryEditReview from '@/components/app/RecoveryEditReview'
+import RecoveryResultFeedback from '@/components/app/RecoveryResultFeedback'
+import { lightRecoveryInstruction, type RenderRecovery } from '@/lib/onboarding/render-recovery'
+import recoveryStyles from '@/components/app/RenderRecovery.module.css'
 
 interface Props {
   initialProject?: FinalizeProject | null
@@ -70,6 +75,8 @@ interface Props {
    *  produção — onde a rota responde 404 — e abriria numa aba que só sabe
    *  falhar. Com false ele é o editor de pós-produção de sempre. */
   aiEnabled?: boolean
+  recovery?: RenderRecovery | null
+  showPlanOffer?: boolean
 }
 
 const PANEL_TITLE: Record<EditorTool, string> = {
@@ -134,6 +141,7 @@ function toStableStorageUrl(url: string): string {
 export function FinalizeEditor({
   initialProject, initialSourceUrl, savedProjects = [],
   initialBalance = null, nodesPerEdit = 18, aiEnabled = false,
+  recovery = null, showPlanOffer = false,
 }: Props) {
   const router = useRouter()
   const viewportRef = useRef<CanvasViewportHandle | null>(null)
@@ -234,15 +242,19 @@ export function FinalizeEditor({
   /** Nas ações de superfície, deixar a seleção crescer até a peça antes de
    *  editar. Ligado por padrão: é a diferença entre um conserto e um remendo,
    *  e ninguém vai pensar "preciso marcar mais do que o defeito". */
-  const [editUniform, setEditUniform] = useState(true)
+  const [editUniform, setEditUniform] = useState(!recovery)
   const [snapBusy, setSnapBusy] = useState(false)
   /** Histórico da SELEÇÃO (vive no viewport; aqui só o que a tela precisa
    *  saber para acender a seta e para o Ctrl+Z decidir a quem obedecer). */
   const [selHistory, setSelHistory] = useState({ canUndo: false, canRedo: false })
   const [wandTolerance, setWandTolerance] = useState(DEFAULT_WAND_OPTIONS.tolerance)
   const [wandContiguous, setWandContiguous] = useState(DEFAULT_WAND_OPTIONS.contiguous)
-  const [editAction, setEditAction] = useState<EditV4Action>('swap_material')
-  const [editInstruction, setEditInstruction] = useState('')
+  const [editAction, setEditAction] = useState<EditV4Action>(recovery?.reason === 'lighting' || recovery?.reason === 'other' ? 'refine_area' : 'swap_material')
+  const [editInstruction, setEditInstruction] = useState(recovery?.reason === 'lighting' ? lightRecoveryInstruction('natural') : '')
+  const [activeRecovery, setActiveRecovery] = useState(recovery)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [recoveryResult, setRecoveryResult] = useState<{ jobId: string | null; url: string; nodes: number } | null>(null)
+  const editSubmitting = useRef(false)
   const [editReferenceUrl, setEditReferenceUrl] = useState<string | null>(null)
   const [editReferenceBusy, setEditReferenceBusy] = useState(false)
   const [editPreservation, setEditPreservation] = useState<EditV4Preservation>('maximum')
@@ -333,6 +345,8 @@ export function FinalizeEditor({
       viewportRef.current?.clearEditRegions()
       setEditReferenceUrl(null)
       setEditMsg(null)
+      setRecoveryResult(null)
+      if (url !== recovery?.outputUrl) { setActiveRecovery(null); setEditInstruction('') }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha ao carregar imagem.')
     }
@@ -848,7 +862,7 @@ export function FinalizeEditor({
 
   const runEdit = useCallback(async () => {
     const cur = docRef.current
-    if (!cur || editBusy) return
+    if (!cur || editBusy || editSubmitting.current || !aiEnabled || (activeRecovery && editReferenceBusy)) return
     const def = EDIT_ACTIONS.find((a2) => a2.id === editAction) ?? EDIT_ACTIONS[0]
     const hasSelection = editStrokes.length > 0 || editWand !== null || hasEditRegions
     if (def.requiresSelection && !hasSelection) {
@@ -861,6 +875,7 @@ export function FinalizeEditor({
       setEditMsg({ kind: 'error', text: 'Descreva a mudança ou marque uma área.' })
       return
     }
+    editSubmitting.current = true
     setEditBusy(true)
     setEditMsg(null)
     // Cresce a seleção ANTES de gastar node. A pessoa marcou o defeito; o que
@@ -952,6 +967,7 @@ export function FinalizeEditor({
       }
       // URL assinada expira — persiste a forma ESTÁVEL (pública/proxy).
       patch(`Editar — ${def.short}`, (d) => ({ ...d, baseUrl: toStableStorageUrl(j.result_url as string) }))
+      if (activeRecovery) setRecoveryResult({ jobId: typeof j.job_id === 'string' ? j.job_id : null, url: toStableStorageUrl(j.result_url), nodes: j.nodes_cost ?? nodesPerEdit })
       setEditStrokes([])
       setEditWand(null)
       viewportRef.current?.clearEditRegions()
@@ -959,14 +975,20 @@ export function FinalizeEditor({
         ? `Tratei a peça inteira (${Math.round(uniformizou.coverage * 1000) / 10}% da imagem) para não ficar remendo. `
         : ''
       setEditMsg({ kind: 'info', text: nota + (j?.warning ?? 'Pronto — seus ajustes continuam por cima. Use Desfazer para voltar.') })
+      if (activeRecovery) requestAnimationFrame(() => {
+        const feedback = asideRef.current?.querySelector<HTMLElement>('[aria-label="Avaliar resultado do ajuste"]')
+        feedback?.scrollIntoView({ block: 'nearest' }); feedback?.focus({ preventScroll: true })
+      })
     } catch (e) {
       setEditMsg({ kind: 'error', text: e instanceof Error ? e.message : 'Falha ao aplicar a edição.' })
     } finally {
+      editSubmitting.current = false
       setEditBusy(false)
     }
   }, [
     editAction, editBusy, editEdge, editInstruction, editIntensity, editPreservation,
     editReferenceUrl, editStrokes, editUniform, editWand, hasEditRegions, patch,
+    activeRecovery, aiEnabled, nodesPerEdit, editReferenceBusy,
   ])
 
   /** Envia a imagem de referência (material ou objeto) da ação atual. */
@@ -1341,7 +1363,7 @@ export function FinalizeEditor({
   const croppedH = Math.round((crop?.h ?? 1) * doc.height)
 
   return (
-    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+    <div className={recovery ? recoveryStyles.editor : undefined} style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       <TopBar
         name={name}
         onName={(n) => { setName(n); markDirty() }}
@@ -1367,10 +1389,10 @@ export function FinalizeEditor({
         error={error}
       />
 
-      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+      <div className={recovery ? recoveryStyles.workspace : undefined} style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         <ToolRail tool={tool} onTool={setTool} aiEnabled={aiEnabled} />
 
-        <div style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0, display: 'flex' }}>
+        <div className={recovery ? recoveryStyles.canvas : undefined} style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0, display: 'flex' }}>
         {tool === 'edit' && (
           <EditToolRail
             tool={editSubTool}
@@ -1518,6 +1540,21 @@ export function FinalizeEditor({
                 />
               )}
               {tool === 'edit' && (
+                <>
+                {activeRecovery && <RenderRecoveryGuide recovery={activeRecovery}
+                  hasSelection={editWand !== null || editStrokes.length > 0 || hasEditRegions}
+                  hasReference={!!editReferenceUrl} busy={editBusy || editReferenceBusy}
+                  onPickReference={() => referenceInputRef.current?.click()}
+                  onPrepare={(action, instruction) => {
+                    setEditAction(action); setEditInstruction(instruction); setEditEdge(null)
+                    if (action === 'refine_area') setEditReferenceUrl(null)
+                    const field = asideRef.current?.querySelector<HTMLTextAreaElement>('textarea')
+                    field?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); field?.focus({ preventScroll: true })
+                  }} />}
+                {activeRecovery && recoveryResult && !editBusy && doc.baseUrl === recoveryResult.url && <RecoveryResultFeedback
+                  key={recoveryResult.jobId ?? recoveryResult.url} recovery={activeRecovery} jobId={recoveryResult.jobId}
+                  outputUrl={recoveryResult.url} nodes={recoveryResult.nodes} showPlanOffer={showPlanOffer}
+                  onAdjust={() => { asideRef.current?.querySelector<HTMLTextAreaElement>('textarea')?.focus() }} />}
                 <EditPanel
                   action={editAction}
                   onAction={(a2) => { setEditAction(a2); setEditEdge(null); setEditReferenceUrl(null) }}
@@ -1591,11 +1628,19 @@ export function FinalizeEditor({
                   onEdge={setEditEdge}
                   nodes={nodesPerEdit}
                   balance={balance}
-                  busy={editBusy}
-                  onExecute={() => void runEdit()}
+                  busy={editBusy || (!!activeRecovery && editReferenceBusy)}
+                  onExecute={() => { if (activeRecovery) setReviewOpen(true); else void runEdit() }}
                   message={editMsg?.text ?? null}
                   messageKind={editMsg?.kind ?? null}
                 />
+                <RecoveryEditReview open={reviewOpen} onClose={() => setReviewOpen(false)}
+                  onConfirm={() => { setReviewOpen(false); void runEdit() }} instruction={editInstruction}
+                  actionLabel={EDIT_ACTIONS.find(item => item.id === editAction)?.short ?? 'Editar'}
+                  settings={`${editPreservation === 'maximum' ? 'Preservação máxima' : 'Preservação padrão'} · Intensidade ${editIntensity === 'subtle' ? 'sutil' : editIntensity === 'strong' ? 'forte' : 'padrão'}`}
+                  selectionMayExpand={editUniform && !!EDIT_ACTIONS.find(item => item.id === editAction)?.uniformizes}
+                  hasSelection={editWand !== null || editStrokes.length > 0 || hasEditRegions}
+                  referenceUrl={editReferenceUrl} nodes={nodesPerEdit} busy={editBusy} />
+                </>
               )}
               {tool === 'geometry' && <GeometryPanel doc={doc} patch={patch} />}
               {tool === 'elements' && (

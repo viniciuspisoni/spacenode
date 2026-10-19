@@ -20,6 +20,10 @@ import { BeforeAfter } from './BeforeAfter'
 import { EditV2ImportModal } from '@/components/editar/EditV2ImportModal'
 import { consumeHandoff } from '@/components/nodi/actions-bus'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
+import RenderRecoveryGuide from '@/components/app/RenderRecoveryGuide'
+import RecoveryEditReview from '@/components/app/RecoveryEditReview'
+import RecoveryResultFeedback from '@/components/app/RecoveryResultFeedback'
+import { lightRecoveryInstruction, type RenderRecovery } from '@/lib/onboarding/render-recovery'
 import {
   ChoiceGroup,
   RowIcon,
@@ -100,6 +104,7 @@ interface HistItem {
   kind: 'original' | 'result'
 }
 interface ResultState {
+  jobId: string | null
   url: string
   before: string
   nodes: number
@@ -120,25 +125,35 @@ export function EditV3Flow({
   initialBalance,
   initialSourceUrl = null,
   allowHighQuality = false,
+  recovery = null,
+  showPlanOffer = false,
 }: {
   initialBalance: number
   initialSourceUrl?: string | null
   /** Alta precisão (Gemini Pro) é gated no servidor (EDIT_V3_ALLOW_PRO). Sem
    *  ela o cartão nem aparece: controle que só devolve 403 não é controle. */
   allowHighQuality?: boolean
+  recovery?: RenderRecovery | null
+  showPlanOffer?: boolean
 }) {
   const [sourceUrl, setSourceUrl] = useState<string | null>(null)
   const [sourceDims, setSourceDims] = useState<{ w: number; h: number } | null>(null)
-  const [action, setAction] = useState<Action>('swap_material')
+  const [action, setAction] = useState<Action>(recovery?.reason === 'lighting' || recovery?.reason === 'other' ? 'refine_area' : 'swap_material')
   const [instruction, setInstruction] = useState('')
+  const [activeRecovery, setActiveRecovery] = useState(recovery)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const instructionRef = useRef<HTMLTextAreaElement | null>(null)
+  const recoveryRenderId = recovery?.renderId
+  const initialRecoveryReason = recovery?.reason
 
   // Handoff do Nodi (ação confirmada no painel): pré-preenche a instrução.
   useEffect(() => {
     const handoff = consumeHandoff('editar')
+    if (recoveryRenderId) return
     if (!handoff?.prompt) return
     const raf = requestAnimationFrame(() => setInstruction(handoff.prompt!))
     return () => cancelAnimationFrame(raf)
-  }, [])
+  }, [recoveryRenderId])
 
   // Precisão — os quatro campos que o contrato já aceitava e o cliente mandava
   // fixos. Os defaults são EXATAMENTE os valores que iam antes no corpo.
@@ -154,7 +169,7 @@ export function EditV3Flow({
   const [brushSize, setBrushSize] = useState(36)
   // A caixa de ferramentas não mora na tela: ela é chamada.
   const [toolsOpen, setToolsOpen] = useState(false)
-  const [cost, setCost] = useState<number | null>(null)
+  const [quote, setQuote] = useState<{ key: string; nodes: number } | null>(null)
   const [busy, setBusy] = useState<null | 'upload' | 'generate'>(null)
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -175,6 +190,8 @@ export function EditV3Flow({
   useAmbient(result?.url ?? sourceUrl)
 
   const actionDef = ACTIONS.find(a => a.id === action)!
+  const quoteKey = JSON.stringify([sourceUrl, action, quality, preservation, intensity, outputResolution, referenceUrl, instruction])
+  const cost = quote?.key === quoteKey ? quote.nodes : null
   const MIN_USABLE = 0.0002
   const SMALL_WARN = 0.004
   const hasSelection = coverage >= MIN_USABLE
@@ -226,7 +243,7 @@ export function EditV3Flow({
     return url
   }, [])
 
-  const applySource = useCallback(async (url: string, keepHistory = false) => {
+  const applySource = useCallback(async (url: string, keepHistory = false, keepRecovery = false) => {
     const dims = await new Promise<{ w: number; h: number } | null>(resolve => {
       const img = new Image()
       img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
@@ -236,7 +253,8 @@ export function EditV3Flow({
     setSourceUrl(url)
     setSourceDims(dims)
     setReferenceUrl(null)
-    setInstruction('')
+    setInstruction(keepRecovery && !keepHistory && initialRecoveryReason === 'lighting' ? lightRecoveryInstruction('natural') : '')
+    if (!keepRecovery) setActiveRecovery(null)
     setCoverage(0)
     setToolsOpen(false)
     setError(null)
@@ -245,11 +263,11 @@ export function EditV3Flow({
     setResult(null)
     setView('edit')
     if (!keepHistory) setHistory([{ url, kind: 'original' }])
-  }, [])
+  }, [initialRecoveryReason])
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      if (initialSourceUrl) void applySource(initialSourceUrl)
+      if (initialSourceUrl) void applySource(initialSourceUrl, false, true)
     })
     return () => cancelAnimationFrame(frame)
   }, [initialSourceUrl, applySource])
@@ -300,7 +318,7 @@ export function EditV3Flow({
           }),
         })
         const json = await res.json().catch(() => null)
-        if (!cancelled && res.ok && typeof json?.nodes_cost === 'number') setCost(json.nodes_cost)
+        if (!cancelled && res.ok && typeof json?.nodes_cost === 'number') setQuote({ key: quoteKey, nodes: json.nodes_cost })
       } catch {
         /* preview best-effort; a geração revalida */
       }
@@ -309,7 +327,7 @@ export function EditV3Flow({
       cancelled = true
       clearTimeout(id)
     }
-  }, [sourceUrl, action, quality, preservation, intensity, outputResolution, referenceUrl, actionDef.ref, instruction])
+  }, [sourceUrl, action, quality, preservation, intensity, outputResolution, referenceUrl, actionDef.ref, instruction, quoteKey])
 
   useEffect(() => {
     if (busy !== 'generate') return
@@ -319,7 +337,7 @@ export function EditV3Flow({
 
   // ── Gerar ───────────────────────────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
-    if (!sourceUrl || busy || submittingRef.current) return
+    if (!sourceUrl || busy || submittingRef.current || (activeRecovery && cost === null)) return
     setError(null)
     setNotice(null)
     const hasPaint = !!canvasRef.current?.hasSelection()
@@ -357,6 +375,7 @@ export function EditV3Flow({
 
       if (res.ok && json?.rejected === false && json?.result_url) {
         const r: ResultState = {
+          jobId: typeof json.job_id === 'string' ? json.job_id : null,
           url: json.result_url,
           before: sourceUrl,
           nodes: json.nodes_cost ?? 0,
@@ -380,11 +399,11 @@ export function EditV3Flow({
       submittingRef.current = false
       setBusy(null)
     }
-  }, [busy, instruction, action, actionDef.ref, quality, preservation, intensity, outputResolution, referenceUrl, sourceUrl, uploadFile])
+  }, [busy, instruction, action, actionDef.ref, quality, preservation, intensity, outputResolution, referenceUrl, sourceUrl, uploadFile, activeRecovery, cost])
 
   const editFromResult = useCallback(() => {
     if (!result) return
-    void applySource(result.url, true)
+    void applySource(result.url, true, true)
     setNotice('Editando a partir do resultado.')
   }, [applySource, result])
 
@@ -482,8 +501,10 @@ export function EditV3Flow({
           <button type="button" className="spn-ghost" onClick={() => setView('edit')}>Voltar e ajustar</button>
           <button type="button" className="spn-ghost" style={ghostRow} onClick={() => void download(result.url)}><IconDownload size={14} /> Baixar</button>
           <div style={{ flex: 1 }} />
-          <button type="button" className="spn-ghost" onClick={() => { setView('edit'); setResult(null); setHistory([]); setSourceUrl(null) }}>Nova imagem</button>
+          <button type="button" className="spn-ghost" onClick={() => { setView('edit'); setResult(null); setHistory([]); setSourceUrl(null); setActiveRecovery(null) }}>Nova imagem</button>
         </div>
+        {activeRecovery && <RecoveryResultFeedback key={result.jobId ?? result.url} recovery={activeRecovery} jobId={result.jobId}
+          outputUrl={result.url} nodes={result.nodes} showPlanOffer={showPlanOffer} onAdjust={() => setView('edit')} />}
 
         {history.length > 1 && (
           <div className="spn-glass" style={{ borderRadius: 'var(--r-card)', marginTop: 16, padding: 12 }}>
@@ -622,6 +643,14 @@ export function EditV3Flow({
 
         {/* ── Zona 2: painel ── */}
         <aside className="edv3-panel spn-tool-panel spn-glass spn-glass--chrome">
+          {activeRecovery && <RenderRecoveryGuide recovery={activeRecovery} hasSelection={hasSelection} hasReference={!!referenceUrl} busy={!!busy}
+            onPickReference={() => { setAction('swap_material'); requestAnimationFrame(() => refInputRef.current?.click()) }}
+            onPrepare={(nextAction, nextInstruction) => {
+              setAction(nextAction); setInstruction(nextInstruction)
+              if (nextAction === 'refine_area') setReferenceUrl(null)
+              if (nextAction === 'swap_material') setToolsOpen(true)
+              instructionRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); instructionRef.current?.focus({ preventScroll: true })
+            }} />}
           <div className="spn-tool-panel-body">
             {/* Ação — superfície: é ela que muda tudo o mais. */}
             <div className="spn-field">
@@ -639,6 +668,8 @@ export function EditV3Flow({
             <div className="spn-field">
               <span className="spn-field-label">Descreva a mudança</span>
               <textarea
+                ref={instructionRef}
+                aria-label="Descreva a mudança"
                 className="spn-textarea"
                 value={instruction}
                 onChange={e => setInstruction(e.target.value)}
@@ -669,7 +700,6 @@ export function EditV3Flow({
                       + {actionDef.refLabel}
                     </button>
                   )}
-                  <input ref={refInputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={async e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (!f) return; try { setError(null); setReferenceUrl(await uploadFile(f, 'source')) } catch { setError('Erro ao enviar referência.') } }} />
                 </div>
               )}
             </div>
@@ -695,7 +725,7 @@ export function EditV3Flow({
                 <div className="spn-cost-main">{cost !== null ? `${cost} nodes` : '—'}</div>
                 <div className="spn-cost-sub">Saldo: {initialBalance} nodes</div>
               </div>
-              <button type="button" className="spn-cta" disabled={!canGenerate} onClick={handleGenerate}>
+              <button type="button" className="spn-cta" disabled={!canGenerate || (!!activeRecovery && cost === null)} onClick={() => { if (activeRecovery) setReviewOpen(true); else void handleGenerate() }}>
                 {busy === 'generate' ? 'Gerando…' : hasSelection ? 'Aplicar na área' : 'Aplicar na imagem'}
               </button>
             </div>
@@ -709,6 +739,11 @@ export function EditV3Flow({
           </div>
         </aside>
       </div>
+
+      <RecoveryEditReview open={reviewOpen} onClose={() => setReviewOpen(false)}
+        onConfirm={() => { setReviewOpen(false); void handleGenerate() }} instruction={instruction}
+        actionLabel={actionDef.label} settings={precisionSummary}
+        hasSelection={hasSelection} referenceUrl={referenceUrl} nodes={cost} busy={!!busy} />
 
       {/* Folha de precisão. Nenhum campo novo: os quatro já viajavam fixos no
           corpo da requisição — o que faltava era a porta. */}
@@ -782,6 +817,13 @@ export function EditV3Flow({
       </Sheet>
 
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void handlePickSource(f); e.currentTarget.value = '' }} />
+      <input ref={refInputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={async e => {
+        const f = e.target.files?.[0]; e.currentTarget.value = ''; if (!f) return
+        setBusy('upload')
+        try { setError(null); setReferenceUrl(await uploadFile(f, 'source')) }
+        catch { setError('Erro ao enviar referência.') }
+        finally { setBusy(null) }
+      }} />
       <EditV2ImportModal open={importOpen} onClose={() => setImportOpen(false)} onSelect={url => void applySource(url)} />
     </div>
   )

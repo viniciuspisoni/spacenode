@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import ResultNextSteps from './ResultNextSteps'
 import type { RenderFeedbackInput, RenderFeedbackReason } from '@/lib/render-feedback'
+import { recoveryHref, RECOVERY_VERSION } from '@/lib/onboarding/render-recovery'
+import { track } from '@/lib/analytics/client'
 
 const REASONS: { id: RenderFeedbackReason; label: string }[] = [
   { id: 'geometry', label: 'Geometria' },
@@ -94,8 +96,9 @@ export function RenderFeedback({ renderId, offer, outputUrl, onNextImage }: {
                   ? 'Experimente um ajuste de luz no Editar e compare com a intenção do projeto.'
                   : 'Escolha o que precisa melhorar e faça um ajuste por vez. Você pode continuar no Editar.'}
           </p>
-          {outputUrl && feedback.reason !== 'geometry' && <Link className="spn-ghost" style={{ marginTop: 10, display: 'inline-flex' }}
-            href={`/app/editar?source=${encodeURIComponent(outputUrl)}&onboarding=1`}>Ajustar esta imagem →</Link>}
+          {outputUrl && <Link className="spn-ghost" style={{ marginTop: 10, display: 'inline-flex' }}
+            onClick={() => track('cta_clicked', { cta: 'onboarding_recovery_started', render_id: renderId, reason: feedback.reason ?? 'other', flow_version: RECOVERY_VERSION })}
+            href={recoveryHref(renderId, feedback.reason)}>{feedback.reason === 'geometry' ? 'Conferir com a referência →' : 'Ajustar com orientação →'}</Link>}
         </>
       )}
       {feedback && <p style={{ margin: '10px 0 0', fontSize: 11, color: 'var(--color-text-tertiary)' }}>

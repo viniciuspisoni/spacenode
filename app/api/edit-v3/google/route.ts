@@ -382,6 +382,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       rejected: false,
       result_url: run.resultUrl,
+      job_id: jobId,
       nodes_cost: nodes,
       charge: { simulated: !chargeOn, debited: charged },
       output: run.outputDims,
