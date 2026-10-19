@@ -1,0 +1,32 @@
+.body { display: grid; gap: 16px; padding: 18px 20px 22px; color: var(--color-text-primary); font-size: 12px; line-height: 1.6; }
+.body p { margin: 0; color: var(--color-text-secondary); }
+.body fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.body legend { font-weight: 560; margin-bottom: 8px; }
+.body label { display: grid; gap: 7px; }
+.body input, .body select { width: 100%; min-width: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.actions button { font-size: 11px; }
+.summary { padding: 14px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; overflow-wrap: anywhere; }
+.summary dl { margin: 10px 0; display: grid; gap: 10px; }
+.summary dl > div { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 10px; }
+.summary dt { color: var(--color-text-secondary); }
+.summary dd { margin: 0; }
+.summary summary, .examples summary { cursor: pointer; padding: 4px 0; color: var(--color-text-primary); }
+.summary details p { margin-top: 8px; }
+.caption { font-size: 11px; color: var(--color-text-tertiary) !important; }
+.referenceBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; font-size: 11px; }
+.warning { font-size: 12px; line-height: 1.6; padding: 10px 12px; border-radius: 10px; background: var(--color-surface); border: 1px solid var(--color-border-strong); color: var(--color-text-secondary); }
+.cropStage { position: relative; margin: auto; overflow: hidden; user-select: none; touch-action: none; border-radius: 8px; background: var(--color-preview-bg); }
+.cropStage img { width: 100%; height: 100%; display: block; pointer-events: none; }
+.cropArea { position: absolute; border: 2px solid white; box-shadow: 0 0 0 10000px #0009; cursor: move; touch-action: none; }
+.cropArea button { position: absolute; width: 32px; height: 32px; background: #fff; color: #151618; border: 1px solid #222; border-radius: 7px; padding: 0; cursor: nwse-resize; touch-action: none; font-size: 16px; }
+.precise { display: grid; gap: 12px; margin-top: 10px; }
+.precise label { display: grid; grid-template-columns: minmax(0,1fr) 100px; gap: 10px; align-items: center; }
+.examples { font-size: 11px; }
+.exampleGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+.exampleGrid figure { margin: 0; min-width: 0; }
+.exampleGrid img { width: 100%; height: 90px; object-fit: contain; background: var(--color-preview-bg); }
+.exampleGrid figcaption { margin-top: 6px; }
+.examplePrint { padding: 16px 10px 8px 18px; background: #555; border-radius: 6px; }
+.body button:focus-visible, .body input:focus-visible, .body select:focus-visible { outline: 2px solid var(--color-text-primary); outline-offset: 3px; }
+@media (max-width: 680px) { .body { padding: 16px; } .summary dl > div { grid-template-columns: 1fr; gap: 2px; } .cropArea button { width: 44px; height: 44px; } }

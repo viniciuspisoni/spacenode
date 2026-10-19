@@ -1,7 +1,8 @@
 'use client'
 
 // Guia opcional, ligado ao estado real de Renderizar. Atalhos só abrem os
-// controles existentes; a lista de comparação não grava feedback de utilidade.
+// controles existentes; a sugestão exige revisão antes de aplicar. A lista de
+// comparação não grava feedback de utilidade.
 
 import { OnboardingVideo } from './OnboardingDemo'
 import { ONBOARDING_GOALS, type OnboardingGoal } from '@/lib/onboarding'
@@ -49,6 +50,7 @@ export default function GenerateGuide({
   onOpenPanel,
   configuration,
   reviewKey,
+  onRecommend,
 }: {
   phase: GuidePhase
   /** true = veio do fluxo Novo Space sem renders — o desfecho aponta o cartão de retorno. */
@@ -64,6 +66,7 @@ export default function GenerateGuide({
   onOpenPanel?: (panel: GuidePanel) => void
   configuration?: GuideConfiguration
   reviewKey?: string | null
+  onRecommend?: () => void
 }) {
   const active = ACTIVE_STEP[phase]
   const intention = goal ? ONBOARDING_GOALS[goal] : null
@@ -135,6 +138,7 @@ export default function GenerateGuide({
               <p>{intention.instruction}</p>
               {onOpenPanel && <button type="button" className="spn-pill" onClick={() => onOpenPanel(intention.panel)}>{intention.action} →</button>}
             </div>}
+            {onRecommend && <div className={styles.tipActions}><button type="button" className="spn-pill" onClick={onRecommend}>Preparar minha primeira imagem →</button><span className={styles.caption}>Revise uma configuração recomendada antes de aplicar.</span></div>}
             {configuration && <details className={styles.guideDetails}>
               <summary>Conferir configuração e custo</summary>
               <div className={styles.configSummary}>
