@@ -38,7 +38,18 @@ const META_KEYS = new Set([
   'kb', 'source', 'confidence', 'category', 'kind', 'issue', 'action', 'count', 'provider',
   // V2
   'tools', 'vision', 'tokens_in', 'tokens_out', 'duration_ms', 'helpful', 'type', 'cost',
+  // First-image pilot: scalars only; never prompts, image data or receipts.
+  'experiment', 'case_id', 'request_id', 'model', 'qa', 'stage', 'proposal', 'cost_estimate_usd', 'render_id', 'config_changed',
 ])
+const PILOT_SERVER_KEYS = new Set(['experiment', 'case_id', 'request_id', 'model', 'qa', 'stage', 'proposal', 'cost_estimate_usd', 'render_id', 'config_changed'])
+
+/** Public panel telemetry cannot impersonate the signed pilot experiment. */
+export function sanitizeClientEventMeta(meta: unknown) {
+  const out = sanitizeEventMeta(meta)
+  for (const key of PILOT_SERVER_KEYS) delete out[key]
+  if (out.source === 'first-image-pilot') delete out.source
+  return out
+}
 
 export function isNodiEvent(value: unknown): value is NodiEventName {
   return typeof value === 'string' && (NODI_EVENTS as readonly string[]).includes(value)

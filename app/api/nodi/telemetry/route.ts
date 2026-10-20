@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { isNodiEnabled } from '@/lib/nodi/flags'
-import { isNodiEvent, logNodiEvent, sanitizeEventMeta } from '@/lib/nodi/telemetry'
+import { isNodiEvent, logNodiEvent, sanitizeClientEventMeta } from '@/lib/nodi/telemetry'
 
 export async function POST(req: Request) {
   if (!isNodiEnabled()) {
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
         event: body.event,
         route: typeof body.route === 'string' ? body.route : null,
         module: typeof body.module === 'string' ? body.module : null,
-        meta: sanitizeEventMeta(body.meta),
+        meta: sanitizeClientEventMeta(body.meta),
       })
     }
   }

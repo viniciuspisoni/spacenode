@@ -6,6 +6,7 @@ import { FIXTURE_LIGHT_LABELS, resolveFixtureLights, type FixtureLights } from '
 import RenderPreservationStatus from '@/components/generate/RenderPreservationStatus'
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { isModuleEnabled } from '@/lib/nav/modules-config'
 import { BrandLoader } from '@/components/brand'
@@ -28,6 +29,8 @@ import { type OnboardingGoal } from '@/lib/onboarding'
 import { useRenderDraft, type DraftSnapshot } from '@/components/app/useRenderDraft'
 import { RenderDraftCard } from '@/components/app/RenderDraftCard'
 import FirstImageRecommendation from '@/components/app/FirstImageRecommendation'
+import { observeFirstImagePilot } from '@/lib/nodi/first-image/client'
+import { pilotConfigurationKey, type PilotAnswer } from '@/lib/nodi/first-image/contract'
 import ReferencePreparation from '@/components/app/ReferencePreparation'
 import { useReferenceImage } from '@/components/app/useReferenceImage'
 import { FIRST_IMAGE_VERSION, smallReference, type FirstImageRecommendation as Recommendation } from '@/lib/onboarding/first-image'
@@ -44,8 +47,11 @@ import {
   type OrionProvider, type OrionVariant, type RenderEngineId,
 } from '@/lib/orion/config'
 
+const FirstImagePilot = dynamic(() => import('@/components/nodi/FirstImagePilot'))
+
 interface GenerateClientProps {
   userId?: string
+  firstImagePilotEnabled?: boolean
   /** Saldo total da bolsa (mensais + extras) — mesmo pool que o débito consome. */
   initialCredits:    number
   /** Motor Orion liberado pra ESTE usuário. Decidido no servidor (page.tsx:
@@ -286,7 +292,7 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
   }
 }
 
-export function GenerateClient({ userId, initialCredits, initialMaterials, initialConfig, initialSourceUrl, initialReview, returnTo, firstRender = false, showPlanOffer = false, orionEnabled = false, orionProvider }: GenerateClientProps) {
+export function GenerateClient({ userId, initialCredits, initialMaterials, initialConfig, initialSourceUrl, initialReview, returnTo, firstRender = false, showPlanOffer = false, orionEnabled = false, orionProvider, firstImagePilotEnabled = false }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig)
   const fromSpacesNew = returnTo === 'spaces/new'
   const supabase = createClient()
@@ -346,7 +352,9 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   const [referenceConverting, setReferenceConverting] = useState(false)
   const referenceRevisionRef = useRef(0)
   const [uncroppedFile, setUncroppedFile] = useState<File | null>(null)
-  const [firstImageSheet, setFirstImageSheet] = useState<'recommendation' | 'reference' | null>(null)
+  const [firstImageSheet, setFirstImageSheet] = useState<'recommendation' | 'reference' | 'pilot' | null>(null)
+  const [pilotReview, setPilotReview] = useState<PilotAnswer | null>(null)
+  const activePilot = useRef<{ receipt: string; expected: string; revision: number } | null>(null)
   const [referenceOrigin, setReferenceOrigin] = useState<'file' | 'existing_render' | 'example' | 'draft'>('file')
   const onboardingAttemptRef = useRef(0)
   const [exampleReference, setExampleReference] = useState(false)
@@ -624,6 +632,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
 
   const commitReference = (file: File, source: 'file' | 'existing_render' | 'example' | 'draft') => {
     setFirstImageSheet(null); setUncroppedFile(null)
+    setPilotReview(null); activePilot.current = null
     setExampleReference(source === 'example')
     setReferenceOrigin(source)
     onboardingAttemptRef.current += 1
@@ -674,6 +683,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
     if (action === 'crop') setUncroppedFile(prev => prev ?? sourceFile)
     else setUncroppedFile(null)
     referenceRevisionRef.current += 1
+    setPilotReview(null); activePilot.current = null
     setSourceFile(file); setPreviewFromFile(file); setServerInputUrl(null)
     setBeforeAspect(null); setScale(1); setPan({ x: 0, y: 0 }); setError(null); setFirstImageSheet(null)
     track('cta_clicked', { cta: action === 'crop' ? 'onboarding_reference_cropped' : 'onboarding_reference_crop_undone', example: exampleReference, flow_version: FIRST_IMAGE_VERSION })
@@ -682,6 +692,15 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
   const applyFirstImageRecommendation = (recommendation: Recommendation) => {
     if (loading) return
     const c = recommendation.config
+    const suggested = pilotReview?.recommendation
+    if (pilotReview && suggested) {
+      const expectedMaterials = suggested.materialChange ? { ...materials, [suggested.materialChange.field]: suggested.materialChange.value } : materials
+      const appliedMaterials = recommendation.materialChange ? { ...materials, [recommendation.materialChange.field]: recommendation.materialChange.value } : materials
+      const expected = pilotConfigurationKey(suggested.config, expectedMaterials, materialRefs, refinementText)
+      activePilot.current = { receipt: pilotReview.receipt, expected, revision: referenceRevisionRef.current }
+      observeFirstImagePilot(pilotReview.receipt, 'applied', { modified: expected !== pilotConfigurationKey(c, appliedMaterials, materialRefs, refinementText) })
+    } else activePilot.current = null
+    setPilotReview(null)
     setProjectType(c.projectType); setSegment(c.segment); setEnvironment(c.environment)
     setLighting(c.lighting); setFixtureLights(c.fixtureLights); setBackground(c.background)
     setSceneElements(c.sceneElements); setSelectedEngine(c.selectedEngine)
@@ -862,6 +881,14 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
       })
       const data: GenerateResult = await res.json()
       if (!res.ok || data.error) throw new Error(data.error ?? 'Erro na geração')
+      const pilot = activePilot.current
+      if (!outputUrl && data.renderId && pilot && pilot.revision === referenceRevisionRef.current) {
+        observeFirstImagePilot(pilot.receipt, 'generated', { renderId: data.renderId, modified: pilot.expected !== pilotConfigurationKey({
+          projectType, segment, environment, lighting, fixtureLights, background, sceneElements,
+          selectedEngine, selectedResolution: resolutionOverride ?? selectedResolution,
+        }, materials, materialRefs, refinementText) })
+        activePilot.current = null
+      }
       setOutputUrl(data.outputUrl); setCredits(data.totalBalance ?? data.credits); setSliderPos(50)
       void draft.complete()
       setCompletedHere(count => count + 1)
@@ -995,6 +1022,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
     if (loading) return
     referenceRevisionRef.current += 1
     setFirstImageSheet(null); setUncroppedFile(null); setReferenceConverting(false)
+    setPilotReview(null); activePilot.current = null
     void draft.complete()
     if (previewObjectUrlRef.current) {
       URL.revokeObjectURL(previewObjectUrlRef.current)
@@ -1635,6 +1663,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
                 configuration={{ cena: `${projectType === 'interior' ? 'Interior' : 'Exterior'} · ${cenaSummary}`, luz: luzSummary, materiais: materiaisSummary, saida: saidaSummary }}
                 reviewKey={lastRenderId ?? outputUrl}
                 onRecommend={!loading && !outputUrl && referenceImage.status === 'ready' && !referenceConverting ? () => {
+                  setPilotReview(null)
                   setSheet(null); setFirstImageSheet('recommendation')
                   track('cta_clicked', { cta: 'onboarding_recommendation_opened', example: exampleReference, flow_version: FIRST_IMAGE_VERSION })
                 } : undefined}
@@ -1668,15 +1697,20 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
                 track('cta_clicked', { cta: 'onboarding_reference_preparation_opened', example: exampleReference, flow_version: FIRST_IMAGE_VERSION })
               }}>Preparar referência</button>
               {uncroppedFile && <button type="button" className="spn-pill" onClick={() => replacePreparedReference(uncroppedFile, 'undo')}>Desfazer recorte</button>}
-              {!guideOpen && <button type="button" className="spn-pill" onClick={() => { setSheet(null); setFirstImageSheet('recommendation') }}>Configuração recomendada</button>}
+              {!guideOpen && <button type="button" className="spn-pill" onClick={() => { setPilotReview(null); setSheet(null); setFirstImageSheet('recommendation') }}>Configuração recomendada</button>}
+              {firstImagePilotEnabled && !exampleReference && <button type="button" className="spn-pill" onClick={() => { setPilotReview(null); setSheet(null); setFirstImageSheet('pilot') }}>Preparar com Nodi · piloto</button>}
             </>}
           </div>}
           {!imagePreview && referenceConverting && <p role="status" className={firstImageStyles.warning}>Preparando a imagem para abrir…</p>}
           {imagePreview && !outputUrl && !referenceConverting && referenceImage.status === 'error' && <p role="alert" className={firstImageStyles.warning}>Não foi possível abrir esta imagem. Envie outro arquivo JPG, PNG ou WebP para continuar.</p>}
           {imagePreview && !outputUrl && referenceImage.size && smallReference(referenceImage.size) && <p className={firstImageStyles.warning}>Esta referência tem poucos pixels ({referenceImage.size.width} × {referenceImage.size.height}). Se puder, exporte uma vista maior do projeto. Você pode continuar com esta imagem.</p>}
           {firstImageSheet === 'recommendation' && !loading && <FirstImageRecommendation projectType={projectType} goal={onboardingGoal} materials={materials} materialRefs={materialRefs}
+            initialRecommendation={pilotReview?.recommendation ?? undefined}
             current={{ scene: `${projectType === 'interior' ? 'Interior' : 'Exterior'} · ${cenaSummary}`, lighting: luzSummary, output: saidaSummary, elements: sceneElements.length }}
-            onClose={() => setFirstImageSheet(null)} onApply={applyFirstImageRecommendation} />}
+            onClose={() => { setPilotReview(null); setFirstImageSheet(null) }} onApply={applyFirstImageRecommendation} />}
+          {firstImageSheet === 'pilot' && firstImagePilotEnabled && !loading && sourceFile && imagePreview && <FirstImagePilot
+            file={sourceFile} previewUrl={imagePreview} projectType={projectType} goal={onboardingGoal}
+            onClose={() => setFirstImageSheet(null)} onReview={answer => { setPilotReview(answer); setFirstImageSheet('recommendation') }} />}
           {firstImageSheet === 'reference' && !loading && sourceFile && imagePreview && referenceImage.size && <ReferencePreparation file={sourceFile} previewUrl={imagePreview} size={referenceImage.size}
             onClose={() => setFirstImageSheet(null)} onApply={file => replacePreparedReference(file, 'crop')} />}
 
