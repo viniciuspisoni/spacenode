@@ -1,12 +1,13 @@
 # Nodi: piloto da primeira imagem
 
-O piloto compara Grok 4.7 e Gemini 2.5 Flash para preparar uma referência própria em Renderizar. Ambos usam a mesma ferramenta de sugestão e o mesmo fluxo de revisão. Gemini é o modelo base do Nodi V2, mas este piloto não reproduz toda a orquestração V2. O Nodi padrão continua com seu fluxo atual.
+O piloto compara Grok 4.1 Fast e Gemini 2.5 Flash para preparar uma referência própria em Renderizar. Ambos usam a mesma ferramenta de sugestão e o mesmo fluxo de revisão. Gemini é o modelo base do Nodi V2, mas este piloto não reproduz toda a orquestração V2. O Nodi padrão continua com seu fluxo atual.
 
 ## Operação
 
 - Exige `NODI_FIRST_IMAGE_PILOT_ENABLED=1`, `NODI_ENABLED=1`, `NODI_V2_ENABLED=1` e `NODI_MULTIMODAL_ENABLED=1`, além de acesso interno decidido no servidor por `isInternalStaff`. Fechado por padrão. Não é um rollout para clientes.
 - AI SDK 7.0.145 usa o AI Gateway com OIDC do deployment Vercel. Não exige chave no navegador. A conta Gateway precisa estar habilitada e ter saldo/limite disponível; não há compra automática de créditos nem fallback silencioso entre braços.
-- IDs verificados no catálogo completo `https://ai-gateway.vercel.sh/v1/models` em 19/10/2026: `spacexai/grok-4.7` e `google/gemini-2.5-flash`. Confirme no catálogo antes de trocar modelos.
+- IDs verificados no catálogo completo `https://ai-gateway.vercel.sh/v1/models` em 19/10/2026: `spacexai/grok-4.1-fast-non-reasoning` e `google/gemini-2.5-flash`. Confirme no catálogo antes de trocar modelos.
+- Na validação real, o 4.7 foi recusado com HTTP 403: não é elegível aos créditos gratuitos. O catálogo filtrado confirmou o 4.1 Fast Non-Reasoning com visão e ferramentas como elegível; esta versão usa esse modelo sem exigir compra. Os eventos anteriores ficam em `2026-10-19-v1`; a comparação atual usa `2026-10-19-v2`.
 - Cada conta interna pode enviar 3 análises/minuto, 20/dia e 200/janela de 30 dias. O contador usa o RPC existente `bump_rate_limit` e recusa a análise se não conseguir conferir o limite. São tetos de requisições, não um orçamento monetário global.
 - Cada análise tem até 2 etapas, 1.200 tokens de saída por etapa, sem retries e prazo de 35 segundos. Cancelar a janela interrompe a espera; o fornecedor ainda pode cobrar trabalho já iniciado.
 
@@ -30,13 +31,13 @@ A única ferramenta do modelo, `preparar_configuracao`, devolve valores do catá
 | `applied` | `v2_action_confirmed` | aplicação informada pelo navegador após revisão |
 | `generated` | `v2_action_confirmed` | render concluído verificado no servidor e pertencente à conta |
 
-Filtre `meta.source='first-image-pilot'` e `meta.experiment='2026-10-19-v1'`. Compare `meta.provider` (`grok`/`control`) por `case_id`; deduplique respostas por `request_id` e observações por `(request_id,stage,render_id)`. O recibo assinado vincula conta, caso, resposta, braço e marca QA, com validade de 1 hora. A rota pública de telemetria não pode preencher os identificadores do experimento.
+Filtre `meta.source='first-image-pilot'` e `meta.experiment='2026-10-19-v2'`. Compare `meta.provider` (`grok`/`control`) por `case_id`; deduplique respostas por `request_id` e observações por `(request_id,stage,render_id)`. O recibo assinado vincula conta, caso, resposta, braço e marca QA, com validade de 1 hora. A rota pública de telemetria não pode preencher os identificadores do experimento.
 
 `qa=true` é o padrão e deve ficar excluído de métricas de usuários reais. `config_changed=true` distingue revisão/ajustes posteriores da proposta original. A atribuição cobre a primeira geração da referência na mesma sessão preparada: troca, recorte, desfazer recorte e novo render a limpam; reload/rascunho retomado ou recibo vencido deixam a atribuição desconhecida. Observações são best effort; ausência não prova abandono.
 
 Para utilidade, una o `render_id` verificado ao `render_feedback.render_id` e leia **`useful` explícito**. Conclusão técnica, download, avaliação da conversa e silêncio não significam resultado útil. A geração real de QA, se realizada, continua custando Nodes; os testes automatizados e de interface usam serviços simulados.
 
-`cost_estimate_usd` usa tokens medidos com taxas nominais de 19/10/2026 (Grok: US$2/M entrada, US$6/M saída; Gemini: US$0,30/M entrada, US$2,50/M saída). Não inclui descontos/cache, ajustes do provedor ou custo de chamadas que falharam sem uso retornado. Confira cobranças reais na observabilidade Gateway. Não são custos totais faturados.
+`cost_estimate_usd` usa tokens medidos com taxas nominais de 19/10/2026 (Grok: US$0,20/M entrada, US$0,50/M saída; Gemini: US$0,30/M entrada, US$2,50/M saída). Não inclui descontos/cache, ajustes do provedor ou custo de chamadas que falharam sem uso retornado. Confira cobranças reais na observabilidade Gateway. Não são custos totais faturados.
 
 Antes de expansão, avalie ao menos 20 casos pareados, alternando qual braço vem primeiro: interior/exterior, modelo/foto, objetivo desconhecido, luz válida, material incompleto, material específico, render pronto, imagem pequena, texto malicioso na referência e falha do provedor. Registre acerto do caminho, necessidade de correção, tempo, custo e utilidade explícita. Testes internos não comprovam aumento de conversão; isso exige uma etapa de medição com usuários reais autorizados.
 
