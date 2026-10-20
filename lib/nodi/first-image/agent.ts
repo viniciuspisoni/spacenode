@@ -7,7 +7,7 @@ import { pilotPreparation, pilotPreparationSchema, type PilotContext, type Pilot
 // IDs and nominal token rates verified in the complete Gateway catalog on 2026-10-19.
 // The control uses the same base model as Nodi V2; both arms share this pilot's flow.
 export const PILOT_MODELS = {
-  grok: { id: 'spacexai/grok-4.7', label: 'Grok 4.7', inputPerMillion: 2, outputPerMillion: 6 },
+  grok: { id: 'spacexai/grok-4.1-fast-non-reasoning', label: 'Grok 4.1 Fast', inputPerMillion: .2, outputPerMillion: .5 },
   control: { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash', inputPerMillion: .3, outputPerMillion: 2.5 },
 } as const
 

@@ -2,7 +2,7 @@ import { ONBOARDING_GOALS, type OnboardingGoal } from '@/lib/onboarding'
 import { FIRST_IMAGE_MATERIAL_FIELDS, firstImageRecommendation, type FirstImageRecommendation } from '@/lib/onboarding/first-image'
 import { PRESERVE, getLighting, type ProjectMaterials, type ProjectType } from '@/lib/prompts'
 
-export const FIRST_IMAGE_PILOT_VERSION = '2026-10-19-v1'
+export const FIRST_IMAGE_PILOT_VERSION = '2026-10-19-v2'
 export const PILOT_VARIANTS = ['grok', 'control'] as const
 export type PilotVariant = typeof PILOT_VARIANTS[number]
 export const PILOT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
