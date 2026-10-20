@@ -24,8 +24,13 @@ export const LAUNCH_OFFER_PERCENT_OFF = 50
  */
 export const LAUNCH_OFFER_ENDS_AT = new Date('2026-08-31T23:59:59-03:00')
 
-/** Desliga a oferta inteira sem mexer na data (kill switch de deploy). */
-export const LAUNCH_OFFER_ENABLED = true
+/**
+ * Desliga a oferta inteira sem mexer na data (kill switch de deploy).
+ * Campanha ENCERRADA em 2026-09-01 — a data acima venceu e este switch
+ * garante que nenhuma UI volte a anunciar o desconto (o gate do
+ * /app/billing roda no relógio do browser do cliente).
+ */
+export const LAUNCH_OFFER_ENABLED = false
 
 /** A campanha está no ar agora? */
 export function isLaunchOfferOpen(now: Date = new Date()): boolean {
