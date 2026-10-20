@@ -19,6 +19,7 @@ describe('bounded native-vision pilot agent', () => {
     expect(first.prompt.at(-1)?.content).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'file', mediaType: 'image/jpeg', data: { type: 'data', data: new Uint8Array([1, 2, 3]) } })]))
     expect(first.tools?.map(t => t.name)).toEqual(['preparar_configuracao'])
     expect(first.maxOutputTokens).toBe(1200)
+    expect(first.providerOptions?.gateway).toEqual({ only: ['vertex'] })
   })
   it.each([
     [{ goal: 'presentation', generate: true }, 'preparar_configuracao'],
