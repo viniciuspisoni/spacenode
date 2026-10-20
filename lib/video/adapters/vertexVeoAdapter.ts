@@ -21,8 +21,8 @@
 // derivamos da proporção da imagem; frame final é SUPORTADO (config.lastFrame).
 
 import { GoogleGenAI } from '@google/genai'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { falAdapter } from './falAdapter'
+import { uploadVideoToStorage } from './storage'
 import type { VideoAdapter, VideoGenerationRequest, VideoGenerationResult } from './types'
 
 export const DEFAULT_VERTEX_VEO_MODEL = 'veo-3.1-generate-001'
@@ -33,7 +33,6 @@ export const DEFAULT_VERTEX_VEO_MODEL = 'veo-3.1-generate-001'
 // evolução p/ fila + polling no cliente (ver comentário em app/api/video).
 const POLL_INTERVAL_MS = 10_000
 const MAX_WAIT_MS      = 260_000
-const STORAGE_BUCKET   = 'space-mestres'
 
 function enabled(): boolean {
   return process.env.VERTEX_VEO_ENABLED === '1'
@@ -103,20 +102,6 @@ async function resolveAspectRatio(requested: string | undefined, imageBuf: Buffe
     // metadata é best-effort — cai no default paisagem
   }
   return '16:9'
-}
-
-// Sobe o MP4 pro Storage e devolve a URL (o CDN do provider não existe aqui).
-// Mesmo bucket/convenção de chave do uploadEditAsset (space-mestres).
-async function uploadVideoToStorage(buf: Buffer, userId: string): Promise<string> {
-  const admin = createAdminClient()
-  const rand  = Math.random().toString(36).slice(2, 8)
-  const key   = `${userId}/animar/${Date.now()}-${rand}.mp4`
-  const { error } = await admin.storage
-    .from(STORAGE_BUCKET)
-    .upload(key, buf, { contentType: 'video/mp4', upsert: false })
-  if (error) throw new Error('upload do vídeo pro Storage falhou: ' + error.message)
-  const { data } = admin.storage.from(STORAGE_BUCKET).getPublicUrl(key)
-  return data.publicUrl
 }
 
 export const vertexVeoAdapter: VideoAdapter = {
