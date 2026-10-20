@@ -20,5 +20,9 @@
 .feedback span { width: 100%; }
 .form { display: grid; gap: 12px; }
 .error { color: var(--color-text-primary); padding: 10px; border: 1px solid var(--color-border-strong); border-radius: 8px; }
+.summary { margin: 0; padding: 12px; display: grid; gap: 8px; border-radius: 8px; background: var(--color-surface); }
+.summary > div { display: grid; grid-template-columns: 65px minmax(0, 1fr); gap: 10px; }
+.summary dt { color: var(--color-text-secondary); }
+.summary dd { margin: 0; }
 .body button:focus-visible, .body textarea:focus-visible, .body select:focus-visible, .check input:focus-visible { outline: 2px solid var(--color-text-primary); outline-offset: 3px; }
 @media (max-width: 680px) { .body { padding: 16px; } .reference { align-items: flex-start; } .reference img { width: 90px; } }

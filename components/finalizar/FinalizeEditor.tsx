@@ -68,6 +68,9 @@ interface Props {
   /** Saldo do PAGADOR, já resolvido no servidor. Evita a ida à rede só para
    *  descobrir quanto a pessoa tem. */
   initialBalance?: number | null
+  initialInstruction?: string
+  reviewBeforeEdit?: boolean
+  editorTitle?: string
   /** Preço de uma edição por IA, derivado em lib/edit-v4/pricing. */
   nodesPerEdit?: number
   /** A edição por IA está ligada neste ambiente (EDIT_V4_ENABLED no servidor)?
@@ -141,7 +144,7 @@ function toStableStorageUrl(url: string): string {
 export function FinalizeEditor({
   initialProject, initialSourceUrl, savedProjects = [],
   initialBalance = null, nodesPerEdit = 18, aiEnabled = false,
-  recovery = null, showPlanOffer = false,
+  recovery = null, showPlanOffer = false, initialInstruction = '', reviewBeforeEdit = false, editorTitle = 'Finalizar',
 }: Props) {
   const router = useRouter()
   const viewportRef = useRef<CanvasViewportHandle | null>(null)
@@ -249,8 +252,8 @@ export function FinalizeEditor({
   const [selHistory, setSelHistory] = useState({ canUndo: false, canRedo: false })
   const [wandTolerance, setWandTolerance] = useState(DEFAULT_WAND_OPTIONS.tolerance)
   const [wandContiguous, setWandContiguous] = useState(DEFAULT_WAND_OPTIONS.contiguous)
-  const [editAction, setEditAction] = useState<EditV4Action>(recovery?.reason === 'lighting' || recovery?.reason === 'other' ? 'refine_area' : 'swap_material')
-  const [editInstruction, setEditInstruction] = useState(recovery?.reason === 'lighting' ? lightRecoveryInstruction('natural') : '')
+  const [editAction, setEditAction] = useState<EditV4Action>(initialInstruction || recovery?.reason === 'lighting' || recovery?.reason === 'other' ? 'refine_area' : 'swap_material')
+  const [editInstruction, setEditInstruction] = useState(initialInstruction || (recovery?.reason === 'lighting' ? lightRecoveryInstruction('natural') : ''))
   const [activeRecovery, setActiveRecovery] = useState(recovery)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [recoveryResult, setRecoveryResult] = useState<{ jobId: string | null; url: string; nodes: number } | null>(null)
@@ -346,7 +349,10 @@ export function FinalizeEditor({
       setEditReferenceUrl(null)
       setEditMsg(null)
       setRecoveryResult(null)
-      if (url !== recovery?.outputUrl) { setActiveRecovery(null); setEditInstruction('') }
+      if (url !== recovery?.outputUrl) {
+        setActiveRecovery(null)
+        setEditInstruction(url === initialSourceUrl ? initialInstruction : '')
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha ao carregar imagem.')
     }
@@ -862,7 +868,11 @@ export function FinalizeEditor({
 
   const runEdit = useCallback(async () => {
     const cur = docRef.current
-    if (!cur || editBusy || editSubmitting.current || !aiEnabled || (activeRecovery && editReferenceBusy)) return
+    if (!cur || editBusy || editSubmitting.current || !aiEnabled || ((activeRecovery || reviewBeforeEdit) && editReferenceBusy)) return
+    if (editInstruction.length > 2000) {
+      setEditMsg({ kind: 'error', text: 'Resuma o pedido em até 2.000 caracteres antes de editar. O texto completo continua visível para revisão.' })
+      return
+    }
     const def = EDIT_ACTIONS.find((a2) => a2.id === editAction) ?? EDIT_ACTIONS[0]
     const hasSelection = editStrokes.length > 0 || editWand !== null || hasEditRegions
     if (def.requiresSelection && !hasSelection) {
@@ -988,7 +998,7 @@ export function FinalizeEditor({
   }, [
     editAction, editBusy, editEdge, editInstruction, editIntensity, editPreservation,
     editReferenceUrl, editStrokes, editUniform, editWand, hasEditRegions, patch,
-    activeRecovery, aiEnabled, nodesPerEdit, editReferenceBusy,
+    activeRecovery, aiEnabled, nodesPerEdit, editReferenceBusy, reviewBeforeEdit,
   ])
 
   /** Envia a imagem de referência (material ou objeto) da ação atual. */
@@ -1290,7 +1300,7 @@ export function FinalizeEditor({
     return (
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px' }}>
-          <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em' }}>Finalizar</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.02em' }}>{editorTitle}</h1>
           <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 8, maxWidth: 620, lineHeight: 1.55 }}>
             Pós-produção profissional para renders: luz, cor, máscaras locais,
             perspectiva, elementos e exportação — tudo não destrutivo, direto no
@@ -1628,8 +1638,8 @@ export function FinalizeEditor({
                   onEdge={setEditEdge}
                   nodes={nodesPerEdit}
                   balance={balance}
-                  busy={editBusy || (!!activeRecovery && editReferenceBusy)}
-                  onExecute={() => { if (activeRecovery) setReviewOpen(true); else void runEdit() }}
+                  busy={editBusy || ((!!activeRecovery || reviewBeforeEdit) && editReferenceBusy)}
+                  onExecute={() => { if (activeRecovery || reviewBeforeEdit) setReviewOpen(true); else void runEdit() }}
                   message={editMsg?.text ?? null}
                   messageKind={editMsg?.kind ?? null}
                 />

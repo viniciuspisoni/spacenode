@@ -1708,8 +1708,8 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
             initialRecommendation={pilotReview?.recommendation ?? undefined}
             current={{ scene: `${projectType === 'interior' ? 'Interior' : 'Exterior'} · ${cenaSummary}`, lighting: luzSummary, output: saidaSummary, elements: sceneElements.length }}
             onClose={() => { setPilotReview(null); setFirstImageSheet(null) }} onApply={applyFirstImageRecommendation} />}
-          {firstImageSheet === 'pilot' && firstImagePilotEnabled && !loading && sourceFile && imagePreview && <FirstImagePilot
-            file={sourceFile} previewUrl={imagePreview} projectType={projectType} goal={onboardingGoal}
+          {firstImageSheet === 'pilot' && firstImagePilotEnabled && userId && !loading && sourceFile && imagePreview && <FirstImagePilot
+            file={sourceFile} previewUrl={imagePreview} projectType={projectType} goal={onboardingGoal} ownerId={userId}
             onClose={() => setFirstImageSheet(null)} onReview={answer => { setPilotReview(answer); setFirstImageSheet('recommendation') }} />}
           {firstImageSheet === 'reference' && !loading && sourceFile && imagePreview && referenceImage.size && <ReferencePreparation file={sourceFile} previewUrl={imagePreview} size={referenceImage.size}
             onClose={() => setFirstImageSheet(null)} onApply={file => replacePreparedReference(file, 'crop')} />}

@@ -18,6 +18,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import EditOnboardingGuide from '@/components/app/EditOnboardingGuide'
+import EditHandoff from '@/components/app/EditHandoff'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 import { redirect } from 'next/navigation'
@@ -65,6 +66,7 @@ export default async function EditarPage({
   const recovery = await loadOwnRenderRecovery(supabase, user.id, params.recovery, params.reason)
   // A recovery always loads this owner's persisted output, never a URL supplied in the link.
   const source = recovery?.outputUrl ?? (params.recovery ? null : safeSource(params.source))
+  const handoffId = !params.recovery && typeof params.handoff === 'string' ? params.handoff : null
   const showPlanOffer = payerBalance.planId === 'free' && !payerBalance.pooled
   if (recovery?.reason === 'geometry') return <main style={{ flex: 1, overflowY: 'auto' }}><RenderRecoveryGuide recovery={recovery} /></main>
 
@@ -86,9 +88,11 @@ export default async function EditarPage({
 
     return (
       <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {guided && !recovery && <EditOnboardingGuide />}
+        {guided && !recovery && !handoffId && <EditOnboardingGuide />}
         <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex' }}>
-          <FinalizeEditor
+          {handoffId ? <EditHandoff key={`${user.id}:${handoffId}`} ownerId={user.id} handoffId={handoffId}
+            editor="v4" savedProjects={savedProjects} initialBalance={balance} showPlanOffer={showPlanOffer}
+            nodesPerEdit={nodesForEdit({ provider: editV4Route() })} aiEnabled={editV4Enabled()} /> : <FinalizeEditor
             key={recovery ? `${recovery.renderId}:${recovery.reason}` : source ?? 'new'}
             savedProjects={savedProjects}
             initialSourceUrl={source}
@@ -97,7 +101,8 @@ export default async function EditarPage({
             initialBalance={balance}
             nodesPerEdit={nodesForEdit({ provider: editV4Route() })}
             aiEnabled={editV4Enabled()}
-          />
+            editorTitle="Editar"
+          />}
         </div>
       </div>
     )
@@ -106,6 +111,12 @@ export default async function EditarPage({
   const useV3 = process.env.NEXT_PUBLIC_EDIT_V3 === '1'
   const useClean = process.env.NEXT_PUBLIC_EDIT_V2_CLEAN === '1'
   const useV2 = process.env.NEXT_PUBLIC_EDIT_V2 === '1'
+
+  // Legacy screens cannot accept a source. Keep the handoff in a supported editor;
+  // the free post-production editor remains available if AI editing is disabled.
+  if (handoffId) return <EditHandoff key={`${user.id}:${handoffId}`} ownerId={user.id} handoffId={handoffId}
+    editor={useV3 ? 'v3' : 'v4'} initialBalance={balance} nodesPerEdit={nodesForEdit({ provider: editV4Route() })}
+    aiEnabled={false} showPlanOffer={showPlanOffer} />
 
   return (
     <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
