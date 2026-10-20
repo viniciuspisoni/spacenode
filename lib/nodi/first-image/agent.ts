@@ -40,6 +40,9 @@ export async function runFirstImagePilot(input: PilotRequest, image: Uint8Array,
   let prepared = false
   const agent = new ToolLoopAgent({
     model: modelOverride ?? PILOT_MODELS[input.variant].id,
+    // This Grok version is currently served only by Vertex in the live endpoint catalog.
+    // A hard allowlist avoids the retired native xAI endpoint and silent provider changes.
+    providerOptions: input.variant === 'grok' ? { gateway: { only: ['vertex'] } } : undefined,
     instructions: pilotInstructions(input.context),
     maxOutputTokens: 1200,
     maxRetries: 0,
