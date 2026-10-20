@@ -2,7 +2,7 @@ import { ONBOARDING_GOALS, type OnboardingGoal } from '@/lib/onboarding'
 import { FIRST_IMAGE_MATERIAL_FIELDS, firstImageRecommendation, type FirstImageRecommendation } from '@/lib/onboarding/first-image'
 import { PRESERVE, getLighting, type ProjectMaterials, type ProjectType } from '@/lib/prompts'
 
-export const FIRST_IMAGE_PILOT_VERSION = '2026-10-19-v4'
+export const FIRST_IMAGE_PILOT_VERSION = '2026-10-20-v5'
 export const PILOT_VARIANTS = ['grok', 'control'] as const
 export type PilotVariant = typeof PILOT_VARIANTS[number]
 export const PILOT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -19,6 +19,14 @@ export interface PilotRequest {
 }
 export interface PilotPreparation {
   goal: OnboardingGoal; lighting?: string; materialField?: keyof ProjectMaterials; material?: string
+}
+export interface PilotDecision {
+  kind: 'prepare' | 'clarify' | 'edit'
+  message: string
+  goal: OnboardingGoal | null
+  lighting: string | null
+  materialField: keyof ProjectMaterials | null
+  material: string | null
 }
 export interface PilotAnswer {
   text: string
@@ -79,4 +87,31 @@ export function pilotPreparationSchema(context: PilotContext) {
       material: { type: 'string' as const, maxLength: 400 },
     },
   }
+}
+
+/** Every answer must declare its next step; an optional tool call cannot leave a ready request as chat only. */
+export function pilotDecisionSchema(context: PilotContext) {
+  return {
+    type: 'object' as const, additionalProperties: false,
+    required: ['kind', 'message', 'goal', 'lighting', 'materialField', 'material'],
+    properties: {
+      kind: { type: 'string' as const, enum: ['prepare', 'clarify', 'edit'] },
+      message: { type: 'string' as const, maxLength: 900 },
+      goal: { type: ['string', 'null'] as ('string' | 'null')[], enum: [...(context.goal ? [context.goal] : Object.keys(ONBOARDING_GOALS)), null] },
+      lighting: { type: ['string', 'null'] as ('string' | 'null')[], enum: [...getLighting(context.projectType, PRESERVE), null] },
+      materialField: { type: ['string', 'null'] as ('string' | 'null')[], enum: [...FIRST_IMAGE_MATERIAL_FIELDS[context.projectType].map(item => item.id), null] },
+      material: { type: ['string', 'null'] as ('string' | 'null')[], maxLength: 400 },
+    },
+  }
+}
+
+export function parsePilotDecision(value: unknown, context: PilotContext): PilotDecision | null {
+  const d = object(value)
+  if (!d || Object.keys(d).length !== 6 || Object.keys(d).some(k => !['kind', 'message', 'goal', 'lighting', 'materialField', 'material'].includes(k)) ||
+    !['prepare', 'clarify', 'edit'].includes(String(d.kind)) || typeof d.message !== 'string' || d.message.length > 900 ||
+    (d.goal !== null && (typeof d.goal !== 'string' || !Object.hasOwn(ONBOARDING_GOALS, d.goal) || (context.goal && d.goal !== context.goal))) ||
+    (d.lighting !== null && (typeof d.lighting !== 'string' || !getLighting(context.projectType, PRESERVE).includes(d.lighting))) ||
+    (d.materialField !== null && !FIRST_IMAGE_MATERIAL_FIELDS[context.projectType].some(item => item.id === d.materialField)) ||
+    (d.material !== null && (typeof d.material !== 'string' || d.material.length > 400))) return null
+  return d as unknown as PilotDecision
 }

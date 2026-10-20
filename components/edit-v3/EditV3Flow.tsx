@@ -124,12 +124,16 @@ const TOOLS: { id: EditV3Tool; label: string; Icon: typeof IconBrush }[] = [
 export function EditV3Flow({
   initialBalance,
   initialSourceUrl = null,
+  initialInstruction = '',
+  reviewBeforeEdit = false,
   allowHighQuality = false,
   recovery = null,
   showPlanOffer = false,
 }: {
   initialBalance: number
   initialSourceUrl?: string | null
+  initialInstruction?: string
+  reviewBeforeEdit?: boolean
   /** Alta precisão (Gemini Pro) é gated no servidor (EDIT_V3_ALLOW_PRO). Sem
    *  ela o cartão nem aparece: controle que só devolve 403 não é controle. */
   allowHighQuality?: boolean
@@ -138,8 +142,8 @@ export function EditV3Flow({
 }) {
   const [sourceUrl, setSourceUrl] = useState<string | null>(null)
   const [sourceDims, setSourceDims] = useState<{ w: number; h: number } | null>(null)
-  const [action, setAction] = useState<Action>(recovery?.reason === 'lighting' || recovery?.reason === 'other' ? 'refine_area' : 'swap_material')
-  const [instruction, setInstruction] = useState('')
+  const [action, setAction] = useState<Action>(initialInstruction || recovery?.reason === 'lighting' || recovery?.reason === 'other' ? 'refine_area' : 'swap_material')
+  const [instruction, setInstruction] = useState(initialInstruction)
   const [activeRecovery, setActiveRecovery] = useState(recovery)
   const [reviewOpen, setReviewOpen] = useState(false)
   const instructionRef = useRef<HTMLTextAreaElement | null>(null)
@@ -148,12 +152,13 @@ export function EditV3Flow({
 
   // Handoff do Nodi (ação confirmada no painel): pré-preenche a instrução.
   useEffect(() => {
+    if (initialInstruction || reviewBeforeEdit) return
     const handoff = consumeHandoff('editar')
     if (recoveryRenderId) return
     if (!handoff?.prompt) return
     const raf = requestAnimationFrame(() => setInstruction(handoff.prompt!))
     return () => cancelAnimationFrame(raf)
-  }, [recoveryRenderId])
+  }, [recoveryRenderId, initialInstruction, reviewBeforeEdit])
 
   // Precisão — os quatro campos que o contrato já aceitava e o cliente mandava
   // fixos. Os defaults são EXATAMENTE os valores que iam antes no corpo.
@@ -204,7 +209,7 @@ export function EditV3Flow({
     action === 'insert_element' ? hasSelection && taskDescribed // posição + o quê
     : action === 'swap_material' ? taskDescribed                // precisa dizer o material
     : taskDescribed || hasSelection                             // remove/refine: texto OU área
-  const canGenerate = !!sourceUrl && busy === null && ready
+  const canGenerate = !!sourceUrl && busy === null && ready && instruction.length <= 2000
 
   // Troca de ação: Inserir é a única que EXIGE seleção, então nela a caixa de
   // ferramentas abre junto. No evento, não num efeito — quem abre a caixa é o
@@ -253,7 +258,8 @@ export function EditV3Flow({
     setSourceUrl(url)
     setSourceDims(dims)
     setReferenceUrl(null)
-    setInstruction(keepRecovery && !keepHistory && initialRecoveryReason === 'lighting' ? lightRecoveryInstruction('natural') : '')
+    setInstruction(url === initialSourceUrl && !keepHistory && initialInstruction ? initialInstruction
+      : keepRecovery && !keepHistory && initialRecoveryReason === 'lighting' ? lightRecoveryInstruction('natural') : '')
     if (!keepRecovery) setActiveRecovery(null)
     setCoverage(0)
     setToolsOpen(false)
@@ -263,7 +269,7 @@ export function EditV3Flow({
     setResult(null)
     setView('edit')
     if (!keepHistory) setHistory([{ url, kind: 'original' }])
-  }, [initialRecoveryReason])
+  }, [initialRecoveryReason, initialSourceUrl, initialInstruction])
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -337,7 +343,8 @@ export function EditV3Flow({
 
   // ── Gerar ───────────────────────────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
-    if (!sourceUrl || busy || submittingRef.current || (activeRecovery && cost === null)) return
+    if (!sourceUrl || busy || submittingRef.current || ((activeRecovery || reviewBeforeEdit) && cost === null)) return
+    if (instruction.length > 2000) { setError('Resuma o pedido em até 2.000 caracteres antes de editar.'); return }
     setError(null)
     setNotice(null)
     const hasPaint = !!canvasRef.current?.hasSelection()
@@ -399,7 +406,7 @@ export function EditV3Flow({
       submittingRef.current = false
       setBusy(null)
     }
-  }, [busy, instruction, action, actionDef.ref, quality, preservation, intensity, outputResolution, referenceUrl, sourceUrl, uploadFile, activeRecovery, cost])
+  }, [busy, instruction, action, actionDef.ref, quality, preservation, intensity, outputResolution, referenceUrl, sourceUrl, uploadFile, activeRecovery, cost, reviewBeforeEdit])
 
   const editFromResult = useCallback(() => {
     if (!result) return
@@ -675,7 +682,9 @@ export function EditV3Flow({
                 onChange={e => setInstruction(e.target.value)}
                 placeholder={actionDef.placeholder}
                 rows={3}
+                maxLength={2000}
               />
+              {instruction.length > 2000 && <p role="alert" className="spn-hint">Seu pedido foi preservado. Resuma em até 2.000 caracteres no campo acima para continuar.</p>}
               <p className="spn-hint">{actionDef.hint}</p>
 
               {actionDef.ref && (
@@ -725,7 +734,7 @@ export function EditV3Flow({
                 <div className="spn-cost-main">{cost !== null ? `${cost} nodes` : '—'}</div>
                 <div className="spn-cost-sub">Saldo: {initialBalance} nodes</div>
               </div>
-              <button type="button" className="spn-cta" disabled={!canGenerate || (!!activeRecovery && cost === null)} onClick={() => { if (activeRecovery) setReviewOpen(true); else void handleGenerate() }}>
+              <button type="button" className="spn-cta" disabled={!canGenerate || ((!!activeRecovery || reviewBeforeEdit) && cost === null)} onClick={() => { if (activeRecovery || reviewBeforeEdit) setReviewOpen(true); else void handleGenerate() }}>
                 {busy === 'generate' ? 'Gerando…' : hasSelection ? 'Aplicar na área' : 'Aplicar na imagem'}
               </button>
             </div>

@@ -1,6 +1,6 @@
 # Nodi: piloto da primeira imagem
 
-O piloto compara Grok 4.7 e Gemini 2.5 Flash para preparar uma referência própria em Renderizar. Ambos usam a mesma ferramenta de sugestão e o mesmo fluxo de revisão. Gemini é o modelo base do Nodi V2, mas este piloto não reproduz toda a orquestração V2. O Nodi padrão continua com seu fluxo atual.
+O piloto compara Grok 4.7 e Gemini 2.5 Flash para preparar uma referência própria em Renderizar. Ambos usam a mesma decisão estruturada e o mesmo fluxo de revisão. Gemini é o modelo base do Nodi V2, mas este piloto não reproduz toda a orquestração V2. O Nodi padrão continua com seu fluxo atual.
 
 ## Operação
 
@@ -8,10 +8,10 @@ O piloto compara Grok 4.7 e Gemini 2.5 Flash para preparar uma referência próp
 - AI SDK 7.0.145 usa o AI Gateway com OIDC do deployment Vercel. Não exige chave no navegador. A conta Gateway precisa estar habilitada e ter saldo/limite disponível; não há compra automática de créditos nem fallback silencioso entre braços.
 - IDs verificados no catálogo completo `https://ai-gateway.vercel.sh/v1/models` em 19/10/2026: `spacexai/grok-4.7` e `google/gemini-2.5-flash`. Confirme no catálogo antes de trocar modelos.
 - Grok 4.7 exige acesso pago no Gateway. O responsável liberou créditos manualmente, e os dois modelos responderam em produção no caso pareado descrito abaixo. Não há compra automática ou alteração de cobrança pelo piloto.
-- A comparação atual usa `2026-10-19-v4`. Os diagnósticos anteriores ficam em `v1` a `v3`: Grok 4.7 recebeu 403 antes da liberação; Grok 4.1 Fast recebeu 404 nas rotas automática e Vertex. Esses eventos não entram no caso validado atual.
+- A comparação atual usa `2026-10-20-v5`: decisão estruturada obrigatória, resumo com custo e transferência para Editar. Os testes reais de 19/10 e as simulações de 20/10 anteriores à mudança pertencem a `2026-10-19-v4` e não validam o novo formato. Os diagnósticos anteriores ficam em `v1` a `v3`: Grok 4.7 recebeu 403 antes da liberação; Grok 4.1 Fast recebeu 404 nas rotas automática e Vertex. Esses eventos não entram no caso validado atual.
 - O catálogo de endpoints lista `xai` para Grok 4.7, com visão e ferramentas. O piloto usa `providerOptions.gateway.only=['xai']` e falha se esse provedor não estiver disponível. Não há fallback para outro modelo. Referência: https://ai-gateway.vercel.sh/v1/models/spacexai/grok-4.7/endpoints.
 - Cada conta interna pode enviar 3 análises/minuto, 20/dia e 200/janela de 30 dias. O contador usa o RPC existente `bump_rate_limit` e recusa a análise se não conseguir conferir o limite. São tetos de requisições, não um orçamento monetário global.
-- Cada análise tem até 2 etapas, 1.200 tokens de saída por etapa, sem retries e prazo de 35 segundos. Cancelar a janela interrompe a espera; o fornecedor ainda pode cobrar trabalho já iniciado.
+- Cada análise tem uma chamada de decisão estruturada, até 1.200 tokens de saída, sem retries e prazo de 35 segundos. Cancelar a janela interrompe a espera; o fornecedor ainda pode cobrar trabalho já iniciado.
 
 ## Validação em produção — 19/10/2026
 
@@ -32,7 +32,19 @@ O usuário confirma origem, tipo de projeto e objetivo. O contexto é travado no
 
 A imagem é enviada só por ação explícita, pelo upload privado já existente (JPG/PNG/WebP estático, até 8 MB, 40 milhões de pixels). A API verifica dono, validade do anexo, bucket privado, tamanho e decodificação. O modelo recebe uma derivada JPEG de até 1.600 px, sem metadados. Renderizar mantém o arquivo original para a geração. Não há busca de URLs fornecidas pelo navegador.
 
-A única ferramenta do modelo, `preparar_configuracao`, devolve valores do catálogo. Não pode gerar, debitar Nodes, recortar, navegar, acessar terminal ou gravar memória. Um render já pronto recebe orientação para Editar. Solicitações de material exigem superfície válida e descrição. A revisão é editável e só Aplicar altera os controles; Gerar render permanece separado e mostra o custo. Descrições e amostras das demais superfícies são preservadas.
+O modelo retorna `prepare`, `clarify` ou `edit` em um objeto obrigatório e validado com `Output.object`. Não dispõe de ferramentas executáveis. O servidor constrói configuração e custo a partir do catálogo, em vez de aceitar preços ou alegações de execução do texto do modelo. Objetivos de apresentação e luz confirmados recebem proposta real, mesmo que o modelo peça autorização redundante; luz sem preferência usa o padrão do catálogo. Solicitações de material exigem superfície válida e descrição; campos incompletos continuam como pergunta. Render pronto recebe orientação para Editar, mesmo se o modelo sugerir gerar novamente. O cartão mostra objetivo, modelo, resolução, luz, material e Nodes antes da revisão. A revisão é editável e só Aplicar altera os controles; Gerar render permanece separado e mostra o custo. Descrições e amostras das demais superfícies são preservadas.
+
+## Referência e intenção → Editar
+
+Para render pronto, “Continuar em Editar com esta imagem” funciona com ou sem análise de IA. Transfere o arquivo original e apenas as mensagens do usuário da conversa selecionada, incluindo o pedido ainda não enviado. Não mistura respostas do assistente ou o outro braço da comparação.
+
+O transporte temporário usa IndexedDB, vinculado ao UUID da conta autenticada e a um token aleatório na URL, com validade de 30 minutos. Não põe imagem, URL de Storage ou intenção na query string ou em telemetria. Faz limpeza de registros vencidos ao ler/gravar. Recusa arquivo vazio, formato inválido, mais de 10 MB (limite atual de Editar), outra conta, token inválido, versão desconhecida ou pedido maior que 4.000 caracteres. Não corta o pedido silenciosamente: orienta resumir se o histórico ultrapassar esse limite.
+
+No destino, reconfere a conta ativa e usa o upload existente `retocar-asset/source`; não há novo bucket ou mudança de permissão. O envio é reaproveitado durante a repetição de efeitos do React, e a referência permanece local durante sua validade para tentar novamente após erro ou reload. Não inicia edição. V4 e V3 recebem a instrução; uma nova imagem escolhida manualmente limpa o pedido anterior. Pedidos acima do limite de edição (2.000 caracteres) ficam preservados e pedem resumo antes de enviar. O botão de edição passa por revisão com custo e confirmação separada. O título da rota unificada é Editar.
+
+Se V4 estiver sem edição por IA, a imagem ainda abre nos ajustes gratuitos e o pedido fica visível com a indisponibilidade explicada. Não habilita o motor pago nem muda flags. Se os editores legados estiverem selecionados, o handoff usa V3 quando ativo ou a pós-produção gratuita do V4, que aceitam imagem inicial.
+
+Não há migration, novos limites de gastos ou liberação para clientes. A evidência de interface usa componentes reais com serviços simulados para verificar preenchimento, revisão e falhas sem debitar Nodes. A nova decisão ainda precisa de revalidação com os provedores após a renovação da cota diária interna; não se zera o contador para testar.
 
 ## Medição e limites da evidência
 
@@ -46,7 +58,7 @@ A única ferramenta do modelo, `preparar_configuracao`, devolve valores do catá
 | `applied` | `v2_action_confirmed` | aplicação informada pelo navegador após revisão |
 | `generated` | `v2_action_confirmed` | render concluído verificado no servidor e pertencente à conta |
 
-Filtre `meta.source='first-image-pilot'` e `meta.experiment='2026-10-19-v4'`. Compare `meta.provider` (`grok`/`control`) por `case_id`; deduplique respostas por `request_id` e observações por `(request_id,stage,render_id)`. O recibo assinado vincula conta, caso, resposta, braço e marca QA, com validade de 1 hora. A rota pública de telemetria não pode preencher os identificadores do experimento.
+Filtre `meta.source='first-image-pilot'` e `meta.experiment='2026-10-20-v5'`. Compare `meta.provider` (`grok`/`control`) por `case_id`; deduplique respostas por `request_id` e observações por `(request_id,stage,render_id)`. O recibo assinado vincula conta, caso, resposta, braço e marca QA, com validade de 1 hora. A rota pública de telemetria não pode preencher os identificadores do experimento.
 
 `qa=true` é o padrão e deve ficar excluído de métricas de usuários reais. `config_changed=true` distingue revisão/ajustes posteriores da proposta original. A atribuição cobre a primeira geração da referência na mesma sessão preparada: troca, recorte, desfazer recorte e novo render a limpam; reload/rascunho retomado ou recibo vencido deixam a atribuição desconhecida. Observações são best effort; ausência não prova abandono.
 

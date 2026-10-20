@@ -106,7 +106,7 @@ export function EditPanel(props: EditPanelProps) {
   const insufficient = props.balance !== null && props.nodes > props.balance
   const blocked = def.requiresSelection && !props.hasSelection
   const canExecute =
-    !props.busy && !insufficient && !blocked &&
+    !props.busy && !insufficient && !blocked && props.instruction.length <= 2000 &&
     (props.hasSelection || props.instruction.trim().length > 0 || !!props.referenceUrl)
 
   return (
@@ -123,12 +123,14 @@ export function EditPanel(props: EditPanelProps) {
           className="spn-textarea"
           aria-label="Descreva a mudança"
           rows={3}
+          maxLength={2000}
           value={props.instruction}
           onChange={e => props.onInstruction(e.target.value)}
           placeholder={def.placeholder}
           disabled={props.busy}
           style={{ marginTop: 10 }}
         />
+        {props.instruction.length > 2000 && <p role="alert" className="spn-hint">Seu pedido foi preservado. Resuma em até 2.000 caracteres no campo acima para continuar.</p>}
         {blocked && (
           <p style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)', marginTop: 8 }}>
             {props.action === 'insert_element'
