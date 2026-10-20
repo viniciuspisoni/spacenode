@@ -7,10 +7,24 @@ O piloto compara Grok 4.7 e Gemini 2.5 Flash para preparar uma referência próp
 - Exige `NODI_FIRST_IMAGE_PILOT_ENABLED=1`, `NODI_ENABLED=1`, `NODI_V2_ENABLED=1` e `NODI_MULTIMODAL_ENABLED=1`, além de acesso interno decidido no servidor por `isInternalStaff`. Fechado por padrão. Não é um rollout para clientes.
 - AI SDK 7.0.145 usa o AI Gateway com OIDC do deployment Vercel. Não exige chave no navegador. A conta Gateway precisa estar habilitada e ter saldo/limite disponível; não há compra automática de créditos nem fallback silencioso entre braços.
 - IDs verificados no catálogo completo `https://ai-gateway.vercel.sh/v1/models` em 19/10/2026: `spacexai/grok-4.7` e `google/gemini-2.5-flash`. Confirme no catálogo antes de trocar modelos.
-- Grok 4.7 exige acesso pago no Gateway; os créditos gratuitos desta conta recusaram a chamada com HTTP 403. A liberação é feita manualmente pelo responsável pela conta. O controle Gemini já respondeu em produção; a validação real do Grok depende dessa liberação. As tentativas com Grok 4.1 Fast receberam 404 tanto na rota automática quanto na rota oficial Vertex; esta versão usa 4.7 por decisão do responsável. Os eventos anteriores ficam em `2026-10-19-v1` a `v3`; a comparação atual usa `2026-10-19-v4`.
+- Grok 4.7 exige acesso pago no Gateway. O responsável liberou créditos manualmente, e os dois modelos responderam em produção no caso pareado descrito abaixo. Não há compra automática ou alteração de cobrança pelo piloto.
+- A comparação atual usa `2026-10-19-v4`. Os diagnósticos anteriores ficam em `v1` a `v3`: Grok 4.7 recebeu 403 antes da liberação; Grok 4.1 Fast recebeu 404 nas rotas automática e Vertex. Esses eventos não entram no caso validado atual.
 - O catálogo de endpoints lista `xai` para Grok 4.7, com visão e ferramentas. O piloto usa `providerOptions.gateway.only=['xai']` e falha se esse provedor não estiver disponível. Não há fallback para outro modelo. Referência: https://ai-gateway.vercel.sh/v1/models/spacexai/grok-4.7/endpoints.
 - Cada conta interna pode enviar 3 análises/minuto, 20/dia e 200/janela de 30 dias. O contador usa o RPC existente `bump_rate_limit` e recusa a análise se não conseguir conferir o limite. São tetos de requisições, não um orçamento monetário global.
 - Cada análise tem até 2 etapas, 1.200 tokens de saída por etapa, sem retries e prazo de 35 segundos. Cancelar a janela interrompe a espera; o fornecedor ainda pode cobrar trabalho já iniciado.
+
+## Validação em produção — 19/10/2026
+
+O commit `a0ad515b869430f06398b63c0d55b19231b91358` foi publicado em `spacenode.app` e testado pela interface autenticada. O caso `747de4c4-a2ce-4b12-aad1-0a4bf14aaf8a`, marcado `qa=true`, usou a referência pública `demo-sketch.jpg`, origem modelo 3D, projeto exterior e objetivo apresentar. A mesma pergunta e referência foram enviadas às conversas separadas.
+
+| Modelo | Proposta revisável | Duração da análise | Tokens de entrada/saída | Estimativa nominal |
+| --- | --- | --- | --- | --- |
+| Grok 4.7 | Sim | 16.048 ms | 6.681 / 712 | US$0,017634 |
+| Gemini 2.5 Flash | Sim | 3.201 ms | 6.006 / 236 | US$0,002392 |
+
+O Grok descreveu a fachada envidraçada, a laje e o terraço com escadas da referência. A tela de revisão mostrou Quasar, 2K, 20 Nodes, luz original, manutenção das descrições/amostras e ausência de elementos extras. A configuração existente continuou intacta: não se aplicou a proposta nem se gerou render em produção; o saldo permaneceu em 5.187 Nodes. Aplicação, preservação dos demais materiais e geração separada já foram verificadas com os componentes reais e serviços simulados.
+
+O servidor registrou as duas respostas com proposta e a avaliação técnica da orientação Grok como `answer_feedback`, sempre `qa=true`. Essa avaliação não confirma utilidade de um render. Uma comparação técnica isolada confirma a integração; não estabelece qualidade geral, ganho de conversão ou custo médio. Os valores acima usam tokens medidos e taxas nominais, não cobrança total faturada.
 
 ## Referência → revisão → geração
 
