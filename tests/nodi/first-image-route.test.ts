@@ -69,7 +69,7 @@ describe('authenticated first-image API', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toContain('no-store')
     const payload = await response.json()
-    expect(payload.answer).toMatchObject({ variant: 'grok', modelLabel: 'Grok 4.1 Fast', recommendation: { nodeCost: 20 } })
+    expect(payload.answer).toMatchObject({ variant: 'grok', modelLabel: 'Grok 4.7', recommendation: { nodeCost: 20 } })
     const derivative = await sharp(mock.agent.mock.calls[0][1]).metadata()
     expect(derivative).toMatchObject({ width: 1600, height: 800, format: 'jpeg' })
     expect(derivative.exif).toBeUndefined()
