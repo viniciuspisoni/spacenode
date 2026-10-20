@@ -8,17 +8,19 @@ import { FIRST_IMAGE_MATERIAL_FIELDS, firstImageRecommendation, recommendedLight
 import { PRESERVE, getLighting, type ProjectMaterials, type ProjectType } from '@/lib/prompts'
 import styles from './FirstImage.module.css'
 
-export default function FirstImageRecommendation({ projectType, goal, materials, materialRefs, current, onClose, onApply }: {
+export default function FirstImageRecommendation({ projectType, goal, materials, materialRefs, current, initialRecommendation, onClose, onApply }: {
   projectType: ProjectType; goal: OnboardingGoal | null
   materials: ProjectMaterials; materialRefs: Partial<Record<keyof ProjectMaterials, string>>
   current: { scene: string; lighting: string; output: string; elements: number }
+  initialRecommendation?: Recommendation
   onClose: () => void; onApply: (recommendation: Recommendation) => void
 }) {
-  const [type, setType] = useState(projectType)
-  const [intention, setIntention] = useState<OnboardingGoal>(goal ?? 'presentation')
-  const [light, setLight] = useState(recommendedLighting(projectType))
-  const [field, setField] = useState<keyof ProjectMaterials>(() => FIRST_IMAGE_MATERIAL_FIELDS[projectType].find(item => materials[item.id]?.trim() || materialRefs[item.id])?.id ?? FIRST_IMAGE_MATERIAL_FIELDS[projectType][0].id)
-  const [descriptions, setDescriptions] = useState<ProjectMaterials>({ ...materials })
+  const initialType = initialRecommendation?.config.projectType ?? projectType
+  const [type, setType] = useState(initialType)
+  const [intention, setIntention] = useState<OnboardingGoal>(initialRecommendation?.goal ?? goal ?? 'presentation')
+  const [light, setLight] = useState(initialRecommendation?.config.lighting ?? recommendedLighting(initialType))
+  const [field, setField] = useState<keyof ProjectMaterials>(() => initialRecommendation?.materialChange?.field ?? FIRST_IMAGE_MATERIAL_FIELDS[initialType].find(item => materials[item.id]?.trim() || materialRefs[item.id])?.id ?? FIRST_IMAGE_MATERIAL_FIELDS[initialType][0].id)
+  const [descriptions, setDescriptions] = useState<ProjectMaterials>(() => initialRecommendation?.materialChange ? { ...materials, [initialRecommendation.materialChange.field]: initialRecommendation.materialChange.value } : { ...materials })
   const recommendation = firstImageRecommendation({ projectType: type, goal: intention, lighting: light, materialField: field, material: descriptions[field], hasMaterialReference: !!materialRefs[field] })
   const config = recommendation?.config
   const existingMaterials = Object.values(materials).some(Boolean) || Object.values(materialRefs).some(Boolean)
