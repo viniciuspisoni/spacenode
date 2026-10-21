@@ -87,6 +87,38 @@ describe('authenticated first-image API', () => {
     expect((await POST(request(input()))).status).toBe(503)
     expect(mock.download).not.toHaveBeenCalled(); expect(mock.agent).not.toHaveBeenCalled()
   })
+  it('refuses an expired sealed reference before reserving quota or reading storage', async () => {
+    const expired = sealUpload('owner', key, Date.now() - 25 * 60 * 60_000)
+    expect((await POST(request({ ...input(), attachmentId: expired }))).status).toBe(400)
+    expect(mock.checkBudget).not.toHaveBeenCalled()
+    expect(mock.download).not.toHaveBeenCalled()
+    expect(mock.agent).not.toHaveBeenCalled()
+  })
+  it('does not call a model when the private object is missing', async () => {
+    mock.list.mockResolvedValue({ data: [], error: null })
+    expect((await POST(request(input()))).status).toBe(503)
+    expect(mock.download).not.toHaveBeenCalled()
+    expect(mock.agent).not.toHaveBeenCalled()
+    expect(mock.log.mock.calls[0][1].meta).toMatchObject({ stage: 'failed', issue: 'reference-unavailable' })
+  })
+  it.each(['corrupt', 'mime-spoof', 'svg'] as const)('rejects decoded image failures before calling a provider (%s)', async kind => {
+    const data = kind === 'mime-spoof'
+      ? await sharp({ create: { width: 16, height: 16, channels: 3, background: '#ddd' } }).png().toBuffer()
+      : Buffer.from(kind === 'svg' ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16"/></svg>' : 'PRIVATE invalid pixels')
+    mock.download.mockResolvedValue({ data: new Blob([new Uint8Array(data)], { type: kind === 'mime-spoof' ? 'image/jpeg' : 'image/png' }), error: null })
+    const result = await POST(request(input()))
+    expect(result.status).toBe(503)
+    expect(await result.text()).not.toContain('PRIVATE')
+    expect(mock.agent).not.toHaveBeenCalled()
+    expect(mock.log.mock.calls[0][1].meta).toMatchObject({ issue: 'reference-unavailable', stage: 'failed' })
+  })
+  it('does not upscale a small decoded reference in the vision derivative', async () => {
+    const image = await sharp({ create: { width: 64, height: 32, channels: 3, background: '#ddd' } }).png().toBuffer()
+    mock.download.mockResolvedValue({ data: new Blob([new Uint8Array(image)], { type: 'image/png' }), error: null })
+    expect((await POST(request(input()))).status).toBe(200)
+    expect(await sharp(mock.agent.mock.calls[0][1]).metadata()).toMatchObject({ width: 64, height: 32, format: 'jpeg' })
+    // This validates image processing only; it makes no claim about readability.
+  })
   it('analyzes decoded private bytes with a metadata-free vision derivative and returns a reviewable answer', async () => {
     const response = await POST(request(input()))
     expect(response.status).toBe(200)

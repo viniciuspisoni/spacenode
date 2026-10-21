@@ -88,8 +88,17 @@ export async function runFirstImagePilot(input: PilotRequest, image: Uint8Array,
         try { await delay(500, undefined, { signal: boundedSignal }) }
         catch { throw new PilotRunError('timeout-or-abort', usage) }
       }
+      const checkRecoveryTime = () => {
+        usage.durationMs = Date.now() - started
+        if (boundedSignal.aborted) throw new PilotRunError('timeout-or-abort', usage)
+        if (usage.durationMs >= 20_000) throw new PilotRunError(failure.issue, usage)
+      }
+      checkRecoveryTime()
       const budget = await reserveRetry().catch(() => 'unavailable' as const)
       if (budget !== 'allowed') throw new PilotRunError(failure.issue, usage, budget)
+      // The delay and quota lookup can consume the remaining recovery window.
+      // Recheck immediately before starting another provider request.
+      checkRecoveryTime()
       usage.recoveredFrom = failure.issue
     }
   }
