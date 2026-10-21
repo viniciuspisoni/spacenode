@@ -40,8 +40,9 @@ const META_KEYS = new Set([
   'tools', 'vision', 'tokens_in', 'tokens_out', 'duration_ms', 'helpful', 'type', 'cost',
   // First-image pilot: scalars only; never prompts, image data or receipts.
   'experiment', 'case_id', 'request_id', 'model', 'qa', 'stage', 'proposal', 'cost_estimate_usd', 'render_id', 'config_changed',
+  'attempts', 'recovered_from', 'retry_budget', 'cost_estimate_complete',
 ])
-const PILOT_SERVER_KEYS = new Set(['experiment', 'case_id', 'request_id', 'model', 'qa', 'stage', 'proposal', 'cost_estimate_usd', 'render_id', 'config_changed'])
+const PILOT_SERVER_KEYS = new Set(['experiment', 'case_id', 'request_id', 'model', 'qa', 'stage', 'proposal', 'cost_estimate_usd', 'render_id', 'config_changed', 'attempts', 'recovered_from', 'retry_budget', 'cost_estimate_complete'])
 
 /** Public panel telemetry cannot impersonate the signed pilot experiment. */
 export function sanitizeClientEventMeta(meta: unknown) {

@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { APICallError } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { runFirstImagePilot, nominalPilotCost } from '@/lib/nodi/first-image/agent'
 import type { PilotDecision, PilotRequest } from '@/lib/nodi/first-image/contract'
+import { PilotRunError } from '@/lib/nodi/first-image/failure'
 
 const usage = { inputTokens: { total: 100, noCache: 100, cacheRead: undefined, cacheWrite: undefined }, outputTokens: { total: 20, text: 20, reasoning: undefined } }
 const decision: PilotDecision = { kind: 'prepare', message: '', goal: 'presentation', lighting: null, materialField: null, material: null }
@@ -21,9 +23,10 @@ describe('bounded native-vision pilot decision', () => {
     expect(first.prompt.at(-1)?.content).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'file', mediaType: 'image/jpeg', data: { type: 'data', data: new Uint8Array([1, 2, 3]) } })]))
     expect(first.tools).toBeUndefined()
     expect(first.responseFormat).toMatchObject({ type: 'json', schema: { additionalProperties: false } })
-    expect(first.maxOutputTokens).toBe(1200)
+    expect(first.maxOutputTokens).toBe(variant === 'control' ? 1800 : 1200)
     expect(model.doGenerateCalls).toHaveLength(1)
     expect(first.providerOptions?.gateway).toEqual(variant === 'grok' ? { only: ['xai'] } : undefined)
+    if (variant === 'control') expect(first.providerOptions?.google).toEqual({ thinkingConfig: { thinkingBudget: 256 } })
   })
   it('prepares confirmed presentation even if the model asks redundant permission or invents a price in its text', async () => {
     const answer = await run(modelFor({ ...decision, kind: 'clarify', message: 'Posso preparar? Já gerei por 1 Node.' }))
@@ -52,10 +55,10 @@ describe('bounded native-vision pilot decision', () => {
     expect(answer.recommendation?.materialChange).toEqual({ field: 'fachada', value: 'freijó claro' })
     expect(model.doGenerateCalls[0].prompt).toEqual(expect.arrayContaining([expect.objectContaining({ role: 'assistant' })]))
   })
-  it('always sends a finished render to Editar, overriding a model proposal', async () => {
-    const answer = await run(modelFor(decision), { ...input, context: { ...input.context, referenceKind: 'render' } })
-    expect(answer.recommendation).toBeNull()
-    expect(answer.text).toContain('Continue em Editar com esta imagem e seu pedido')
+  it('never calls a model for a finished render', async () => {
+    const model = modelFor(decision)
+    await expect(run(model, { ...input, context: { ...input.context, referenceKind: 'render' } })).rejects.toThrow('Editar')
+    expect(model.doGenerateCalls).toHaveLength(0)
   })
   it.each([
     { ...decision, execute: true },
@@ -68,5 +71,57 @@ describe('bounded native-vision pilot decision', () => {
     const model = modelFor(value)
     await expect(run(model)).rejects.toThrow()
     expect(model.doGenerateCalls).toHaveLength(1)
+  })
+})
+
+describe('bounded recovery without changing the selected model or quota', () => {
+  const response = (text = JSON.stringify(decision), finish: 'stop' | 'length' = 'stop') => ({ content: [{ type: 'text' as const, text }], finishReason: { unified: finish, raw: undefined }, usage, warnings: [] })
+  const recover = (model: MockLanguageModelV4, reserve: () => Promise<'allowed' | 'limited' | 'unavailable'>, signal = new AbortController().signal) =>
+    runFirstImagePilot({ ...input, variant: 'control' }, new Uint8Array([1, 2, 3]), signal, model, reserve)
+
+  it('recovers truncated JSON with one budgeted retry and includes both calls in nominal usage', async () => {
+    const model = new MockLanguageModelV4({ doGenerate: [response('{"kind":', 'length'), response()] })
+    const reserve = vi.fn().mockResolvedValue('allowed')
+    const answer = await recover(model, reserve)
+    expect(reserve).toHaveBeenCalledTimes(1)
+    expect(model.doGenerateCalls).toHaveLength(2)
+    expect(model.doGenerateCalls[0].prompt).toEqual(model.doGenerateCalls[1].prompt)
+    expect(answer.recommendation?.nodeCost).toBe(20)
+    expect(answer.usage).toMatchObject({ attempts: 2, recoveredFrom: 'output-truncated', inputTokens: 200, outputTokens: 40, costComplete: true, nominalUsd: nominalPilotCost('control', 200, 40) })
+  })
+  it.each(['limited', 'unavailable'] as const)('does not retry when the extra quota reservation is %s', async budget => {
+    const model = new MockLanguageModelV4({ doGenerate: response('invalid') })
+    await expect(recover(model, async () => budget)).rejects.toMatchObject({ issue: 'output-invalid', retryBudget: budget, usage: { attempts: 1 } })
+    expect(model.doGenerateCalls).toHaveLength(1)
+  })
+  it('never loops after a second invalid response and never keeps raw text on its safe error', async () => {
+    const model = new MockLanguageModelV4({ doGenerate: response('SECRET prompt and image') })
+    const error = await recover(model, async () => 'allowed').catch(e => e)
+    expect(error).toBeInstanceOf(PilotRunError)
+    expect(error.usage).toMatchObject({ attempts: 2, inputTokens: 200, outputTokens: 40 })
+    expect(model.doGenerateCalls).toHaveLength(2)
+    expect(error.cause).toBeUndefined()
+    expect(JSON.stringify(error)).not.toContain('SECRET')
+  })
+  it('retries a transient HTTP failure once and marks missing provider usage as incomplete', async () => {
+    const generate = vi.fn().mockRejectedValueOnce(new APICallError({ message: 'SECRET', url: 'https://provider.invalid', requestBodyValues: {}, statusCode: 503, isRetryable: true })).mockResolvedValueOnce(response())
+    const model = new MockLanguageModelV4({ doGenerate: generate })
+    const answer = await recover(model, async () => 'allowed')
+    expect(generate).toHaveBeenCalledTimes(2)
+    expect(answer.usage).toMatchObject({ attempts: 2, recoveredFrom: 'http-503', costComplete: false })
+  })
+  it.each([401, 402, 429])('does not retry authentication, credits or throttling (%s)', async statusCode => {
+    const generate = vi.fn().mockRejectedValue(new APICallError({ message: 'SECRET', url: 'https://provider.invalid', requestBodyValues: {}, statusCode }))
+    const reserve = vi.fn().mockResolvedValue('allowed')
+    await expect(recover(new MockLanguageModelV4({ doGenerate: generate }), reserve)).rejects.toMatchObject({ issue: `http-${statusCode}` })
+    expect(generate).toHaveBeenCalledTimes(1)
+    expect(reserve).not.toHaveBeenCalled()
+  })
+  it('does not spend or retry after user cancellation', async () => {
+    const controller = new AbortController(); controller.abort()
+    const model = modelFor(decision), reserve = vi.fn().mockResolvedValue('allowed')
+    await expect(recover(model, reserve, controller.signal)).rejects.toMatchObject({ issue: 'timeout-or-abort', usage: { attempts: 0 } })
+    expect(model.doGenerateCalls).toHaveLength(0)
+    expect(reserve).not.toHaveBeenCalled()
   })
 })

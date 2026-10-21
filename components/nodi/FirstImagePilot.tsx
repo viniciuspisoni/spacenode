@@ -10,7 +10,7 @@ import { PRESERVE, type ProjectType } from '@/lib/prompts'
 import { ENGINES } from '@/lib/engines'
 import { FIRST_IMAGE_MATERIAL_FIELDS } from '@/lib/onboarding/first-image'
 import { editHandoffIntention, saveEditHandoff } from '@/lib/onboarding/edit-handoff'
-import type { PilotAnswer, PilotContext, PilotTurn, PilotVariant } from '@/lib/nodi/first-image/contract'
+import { DEFAULT_PILOT_VARIANT, type PilotAnswer, type PilotContext, type PilotTurn, type PilotVariant } from '@/lib/nodi/first-image/contract'
 import { observeFirstImagePilot } from '@/lib/nodi/first-image/client'
 import styles from './FirstImagePilot.module.css'
 
@@ -22,7 +22,7 @@ export default function FirstImagePilot({ file, previewUrl, projectType, goal, o
   onClose: () => void; onReview: (answer: PilotAnswer) => void
 }) {
   const router = useRouter()
-  const [variant, setVariant] = useState<PilotVariant>('grok')
+  const [variant, setVariant] = useState<PilotVariant>(DEFAULT_PILOT_VARIANT)
   const [caseId, setCaseId] = useState('')
   const [type, setType] = useState(projectType)
   const [intention, setIntention] = useState<OnboardingGoal | null>(goal)
@@ -45,7 +45,7 @@ export default function FirstImagePilot({ file, previewUrl, projectType, goal, o
   const locked = busy || transferring
   useEffect(() => { if (started || busy) end.current?.scrollIntoView({ block: 'nearest' }) }, [conversations, busy, started])
   async function send() {
-    if (inFlight.current || transferLock.current || !kind) return
+    if (inFlight.current || transferLock.current || !kind || kind === 'render') return
     const message = input.trim() || (messages.length ? '' : 'Quero preparar esta referência para minha primeira imagem. Me ajude a escolher os ajustes.')
     if (!message) return
     inFlight.current = true; setBusy(true); setError('')
@@ -90,7 +90,7 @@ export default function FirstImagePilot({ file, previewUrl, projectType, goal, o
   }
   return <Sheet open title="Nodi · primeira imagem" onClose={onClose} doneLabel="Voltar à referência">
     <div className={styles.body}>
-      <div className={styles.intro}><NodiAvatar size={32} state={busy ? 'thinking' : 'idle'} /><div><strong>Piloto interno</strong><p>Compare a preparação com Grok e com Gemini, o modelo base do Nodi atual. Cada opção tem sua própria conversa.</p></div></div>
+      <div className={styles.intro}><NodiAvatar size={32} state={busy ? 'thinking' : 'idle'} /><div><strong>Piloto interno · Gemini como padrão</strong><p>O Nodi prepara sua primeira imagem com Gemini. A comparação com Grok continua disponível para testes da equipe, em conversa separada.</p></div></div>
       <div className={styles.reference}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={previewUrl} alt="Referência desta comparação" />
@@ -103,12 +103,12 @@ export default function FirstImagePilot({ file, previewUrl, projectType, goal, o
         <label className={styles.check}><input type="checkbox" checked={qa} onChange={e => setQa(e.target.checked)} />Conversa de teste técnico; excluir da medição de usuários reais</label>
       </fieldset>
       {started && <button type="button" className="spn-pill" disabled={locked} onClick={() => { setCaseId(''); setConversations({ grok: [], control: [] }); setError(''); setInput('') }}>Recomeçar comparação</button>}
-      <div className={styles.variants} role="group" aria-label="Modelo da comparação">{(['grok', 'control'] as const).map(item => <button type="button" className="spn-pill" key={item} disabled={locked} aria-pressed={variant === item} onClick={() => {
+      {kind !== 'render' && <div className={styles.variants} role="group" aria-label="Modelo da comparação">{(['control', 'grok'] as const).map(item => <button type="button" className="spn-pill" key={item} disabled={locked} aria-pressed={variant === item} onClick={() => {
         if (item === variant) return
         if (!input.trim() && !conversations[item].length) setInput(messages.find(m => m.role === 'user')?.text ?? '')
         setVariant(item); setError('')
-      }}>{item === 'grok' ? 'Grok' : 'Gemini · comparação'}</button>)}</div>
-      <p className={styles.caption}>Ao enviar, a referência e esta conversa serão analisadas pelo modelo escolhido. Use JPG, PNG ou WebP de até 8 MB. Você revisa os ajustes antes de aplicar e confere o custo antes de gerar.</p>
+      }}>{item === 'grok' ? 'Grok · comparação' : 'Gemini · padrão'}</button>)}</div>}
+      <p className={styles.caption}>{kind === 'render' ? 'Sua imagem já está pronta. Leve-a direto para Editar com seu pedido, sem esperar uma análise de IA.' : 'Ao enviar, a referência e esta conversa serão analisadas pelo modelo escolhido. Use JPG, PNG ou WebP de até 8 MB. Você revisa os ajustes antes de aplicar e confere o custo antes de gerar.'}</p>
       <div className={styles.thread} aria-live="polite" aria-label={`Conversa com ${variant === 'grok' ? 'Grok' : 'Gemini'}`}>
         {messages.map((m, i) => <article key={`${variant}:${i}`} className={m.role === 'user' ? styles.user : styles.answer}>
           <strong>{m.role === 'user' ? 'Você' : `Nodi · ${m.answer?.modelLabel ?? ''}`}</strong><p>{m.text}</p>
@@ -132,12 +132,11 @@ export default function FirstImagePilot({ file, previewUrl, projectType, goal, o
         <div ref={end} />
       </div>
       {error && <p role="alert" className={styles.error}>{error}</p>}
-      <form onSubmit={e => { e.preventDefault(); void send() }} className={styles.form}>
+      <form onSubmit={e => { e.preventDefault(); if (kind === 'render') void continueInEdit(); else void send() }} className={styles.form}>
         <label>O que você quer alcançar com esta imagem?<textarea className="spn-input" value={input} maxLength={900} rows={3} placeholder={kind === 'render' ? 'Ex.: suavizar a luz e manter os materiais da fachada' : 'Ex.: apresentar a fachada ao cliente com uma luz de fim de tarde'} disabled={locked} onChange={e => setInput(e.target.value)} /></label>
-        <button type="submit" className="spn-cta" disabled={locked || !kind || (messages.length > 0 && !input.trim())}>{busy ? 'Analisando…' : messages.length ? 'Enviar para o Nodi' : 'Analisar referência'}</button>
+        <button type="submit" className="spn-cta" disabled={locked || !kind || (kind !== 'render' && messages.length > 0 && !input.trim())}>{transferring ? 'Preparando imagem…' : kind === 'render' ? 'Continuar em Editar com esta imagem' : busy ? 'Analisando…' : messages.length ? 'Enviar para o Nodi' : 'Analisar referência'}</button>
       </form>
-      {kind === 'render' && <div className={styles.form}><p>Continue com esta imagem e o pedido que você escreveu. Não é necessário analisar com o Nodi para abrir Editar.</p>
-        <button type="button" className="spn-cta" disabled={locked} onClick={() => void continueInEdit()}>{transferring ? 'Preparando imagem…' : 'Continuar em Editar com esta imagem'}</button>
+      {kind === 'render' && <div className={styles.form}>
         <p className={styles.caption}>O pedido vai preenchido. Nenhuma edição é enviada nesta etapa.</p>
       </div>}
     </div>
