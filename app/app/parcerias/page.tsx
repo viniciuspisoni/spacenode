@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic'
 type ReferralRow = {
   referred_user_id: string
   created_at: string
+  reward_override_nodes: number | null
 }
 type ProfileRow = { id: string; email: string | null; plan: string }
 type RewardRow = {
@@ -43,7 +44,7 @@ export default async function ParceriasPage() {
   const admin = createAdminClient()
   const [referralsResult, rewardsResult] = await Promise.all([
     admin.from('referrals')
-      .select('referred_user_id, created_at')
+      .select('referred_user_id, created_at, reward_override_nodes')
       .eq('referrer_user_id', user.id)
       .order('created_at', { ascending: false }),
     admin.from('lumen_packs')
@@ -53,7 +54,15 @@ export default async function ParceriasPage() {
       .order('purchased_at', { ascending: false }),
   ])
 
-  const referrals = (referralsResult.data ?? []) as ReferralRow[]
+  // O código pode ser publicado antes da coluna da migration. Nesse intervalo,
+  // mantém o painel funcional com as indicações padrão.
+  const referrals = referralsResult.error?.code === '42703'
+    ? (((await admin.from('referrals')
+        .select('referred_user_id, created_at')
+        .eq('referrer_user_id', user.id)
+        .order('created_at', { ascending: false })).data ?? []) as Omit<ReferralRow, 'reward_override_nodes'>[])
+        .map(row => ({ ...row, reward_override_nodes: null }))
+    : (referralsResult.data ?? []) as ReferralRow[]
   const rewards = (rewardsResult.data ?? []) as RewardRow[]
   const ids = referrals.map(row => row.referred_user_id)
   const profilesResult = ids.length
@@ -68,8 +77,8 @@ export default async function ParceriasPage() {
     rewardsByReferred.set(reward.referred_user_id, previous)
   }
 
-  const active = referrals.filter(row => referralReward(profiles.get(row.referred_user_id)?.plan ?? '') > 0)
-  const potential = active.reduce((total, row) => total + referralReward(profiles.get(row.referred_user_id)?.plan ?? ''), 0)
+  const active = referrals.filter(row => referralReward(profiles.get(row.referred_user_id)?.plan ?? '', row.reward_override_nodes) > 0)
+  const potential = active.reduce((total, row) => total + referralReward(profiles.get(row.referred_user_id)?.plan ?? '', row.reward_override_nodes), 0)
   const earned = rewards.reduce((total, row) => total + row.nodes_initial, 0)
   const path = `/r/${user.id}`
 
@@ -123,7 +132,7 @@ export default async function ParceriasPage() {
               {referrals.map(row => {
                 const profile = profiles.get(row.referred_user_id)
                 const history = rewardsByReferred.get(row.referred_user_id) ?? []
-                const amount = referralReward(profile?.plan ?? '')
+                const amount = referralReward(profile?.plan ?? '', row.reward_override_nodes)
                 const legacyPaid = profile?.plan === 'starter' || profile?.plan === 'office'
                 const status = amount > 0 ? 'Assinando' : legacyPaid ? 'Plano sem prêmio' : history.length > 0 ? 'Assinatura encerrada' : 'Aguardando assinatura'
                 return (
