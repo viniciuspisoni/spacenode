@@ -1,17 +1,19 @@
 # Nodi: piloto da primeira imagem
 
-O piloto compara Grok 4.7 e Gemini 2.5 Flash para preparar uma referência própria em Renderizar. Ambos usam a mesma decisão estruturada e o mesmo fluxo de revisão. Gemini é o modelo base do Nodi V2, mas este piloto não reproduz toda a orquestração V2. O Nodi padrão continua com seu fluxo atual.
+O piloto usa Gemini 2.5 Flash como padrão para preparar uma referência própria em Renderizar. Grok 4.7 permanece como comparação explícita da equipe, em conversa separada. Ambos usam a mesma decisão estruturada e o mesmo fluxo de revisão. Este piloto não reproduz toda a orquestração V2 e continua restrito à equipe.
 
 ## Operação
 
 - Exige `NODI_FIRST_IMAGE_PILOT_ENABLED=1`, `NODI_ENABLED=1`, `NODI_V2_ENABLED=1` e `NODI_MULTIMODAL_ENABLED=1`, além de acesso interno decidido no servidor por `isInternalStaff`. Fechado por padrão. Não é um rollout para clientes.
 - AI SDK 7.0.145 usa o AI Gateway com OIDC do deployment Vercel. Não exige chave no navegador. A conta Gateway precisa estar habilitada e ter saldo/limite disponível; não há compra automática de créditos nem fallback silencioso entre braços.
-- IDs verificados no catálogo completo `https://ai-gateway.vercel.sh/v1/models` em 19/10/2026: `spacexai/grok-4.7` e `google/gemini-2.5-flash`. Confirme no catálogo antes de trocar modelos.
+- IDs e taxas nominais reconferidos no catálogo completo `https://ai-gateway.vercel.sh/v1/models` em 21/10/2026: `spacexai/grok-4.7` e `google/gemini-2.5-flash`. Confirme no catálogo antes de trocar modelos.
 - Grok 4.7 exige acesso pago no Gateway. O responsável liberou créditos manualmente, e os dois modelos responderam em produção no caso pareado descrito abaixo. Não há compra automática ou alteração de cobrança pelo piloto.
-- A comparação atual usa `2026-10-20-v5`: decisão estruturada obrigatória, resumo com custo e transferência para Editar. Os testes reais de 19/10 e as simulações de 20/10 anteriores à mudança pertencem a `2026-10-19-v4` e não validam o novo formato. Os diagnósticos anteriores ficam em `v1` a `v3`: Grok 4.7 recebeu 403 antes da liberação; Grok 4.1 Fast recebeu 404 nas rotas automática e Vertex. Esses eventos não entram no caso validado atual.
+- A versão atual é `2026-10-21-v6`: Gemini padrão, orçamento de saída ajustado, recuperação limitada e render pronto direto para Editar. A rodada de 14 chamadas de 21/10 às 08:41–08:52 UTC pertence a `2026-10-20-v5` e fica separada da v6. V4 e versões anteriores são históricas e não validam o formato atual.
 - O catálogo de endpoints lista `xai` para Grok 4.7, com visão e ferramentas. O piloto usa `providerOptions.gateway.only=['xai']` e falha se esse provedor não estiver disponível. Não há fallback para outro modelo. Referência: https://ai-gateway.vercel.sh/v1/models/spacexai/grok-4.7/endpoints.
 - Cada conta interna pode enviar 3 análises/minuto, 20/dia e 200/janela de 30 dias. O contador usa o RPC existente `bump_rate_limit` e recusa a análise se não conseguir conferir o limite. São tetos de requisições, não um orçamento monetário global.
-- Cada análise tem uma chamada de decisão estruturada, até 1.200 tokens de saída, sem retries e prazo de 35 segundos. Cancelar a janela interrompe a espera; o fornecedor ainda pode cobrar trabalho já iniciado.
+- Cada análise faz uma chamada e pode recuperar uma resposta incompleta/inválida ou HTTP 500/502/503/504 com uma única chamada adicional ao mesmo modelo, se ainda houver tempo e uma nova reserva nos mesmos contadores permitir. Não repete 401/402/429, bloqueio de conteúdo, cancelamento ou erro desconhecido. O prazo total das chamadas é de 35 segundos; não começa recuperação após 20 segundos. Cada tentativa consome a cota existente, sem zerar contadores nem aumentar limites.
+- Gemini usa `thinkingBudget=256` e até 1.800 tokens de saída, deixando espaço para o JSON completo. Grok mantém 1.200 tokens. Cancelar a janela interrompe a espera; o fornecedor ainda pode cobrar trabalho iniciado. O SDK não faz retries ocultos (`maxRetries=0`).
+- Na falha Gemini v5 de 08:52 UTC, o Gateway registrou HTTP 200, 1.148 tokens de processamento interno e apenas 35 tokens de texto. Isso indica provável truncamento, mas o código v5 não registrava a causa do SDK. A v6 distingue `output-truncated`, `output-invalid`, `output-blocked`, HTTP e cancelamento sem guardar o erro bruto.
 
 ## Validação em produção — 19/10/2026
 
@@ -32,11 +34,11 @@ O usuário confirma origem, tipo de projeto e objetivo. O contexto é travado no
 
 A imagem é enviada só por ação explícita, pelo upload privado já existente (JPG/PNG/WebP estático, até 8 MB, 40 milhões de pixels). A API verifica dono, validade do anexo, bucket privado, tamanho e decodificação. O modelo recebe uma derivada JPEG de até 1.600 px, sem metadados. Renderizar mantém o arquivo original para a geração. Não há busca de URLs fornecidas pelo navegador.
 
-O modelo retorna `prepare`, `clarify` ou `edit` em um objeto obrigatório e validado com `Output.object`. Não dispõe de ferramentas executáveis. O servidor constrói configuração e custo a partir do catálogo, em vez de aceitar preços ou alegações de execução do texto do modelo. Objetivos de apresentação e luz confirmados recebem proposta real, mesmo que o modelo peça autorização redundante; luz sem preferência usa o padrão do catálogo. Solicitações de material exigem superfície válida e descrição; campos incompletos continuam como pergunta. Render pronto recebe orientação para Editar, mesmo se o modelo sugerir gerar novamente. O cartão mostra objetivo, modelo, resolução, luz, material e Nodes antes da revisão. A revisão é editável e só Aplicar altera os controles; Gerar render permanece separado e mostra o custo. Descrições e amostras das demais superfícies são preservadas.
+O modelo retorna uma decisão obrigatória validada com `Output.object`. Não dispõe de ferramentas executáveis. O servidor constrói configuração e custo a partir do catálogo, em vez de aceitar preços ou alegações de execução do texto do modelo. Objetivos de apresentação e luz confirmados recebem proposta real, mesmo que o modelo peça autorização redundante; luz sem preferência usa o padrão do catálogo. Solicitações de material exigem superfície válida e descrição; campos incompletos continuam como pergunta. Render pronto segue diretamente para Editar sem chamar modelo. O cartão mostra objetivo, modelo, resolução, luz, material e Nodes antes da revisão. A revisão é editável e só Aplicar altera os controles; Gerar render permanece separado e mostra o custo. Descrições e amostras das demais superfícies são preservadas.
 
 ## Referência e intenção → Editar
 
-Para render pronto, “Continuar em Editar com esta imagem” funciona com ou sem análise de IA. Transfere o arquivo original e apenas as mensagens do usuário da conversa selecionada, incluindo o pedido ainda não enviado. Não mistura respostas do assistente ou o outro braço da comparação.
+Para render pronto, a única ação do formulário é “Continuar em Editar com esta imagem”. Não envia análise nem consome cota do piloto; a API também recusa esse tipo de referência antes do upload e da reserva de análise. Transfere o arquivo original e o pedido ainda não enviado. A função de transferência conserva a separação de conversas e nunca inclui respostas do assistente ou o outro braço.
 
 O transporte temporário usa IndexedDB, vinculado ao UUID da conta autenticada e a um token aleatório na URL, com validade de 30 minutos. Não põe imagem, URL de Storage ou intenção na query string ou em telemetria. Faz limpeza de registros vencidos ao ler/gravar. Recusa arquivo vazio, formato inválido, mais de 10 MB (limite atual de Editar), outra conta, token inválido, versão desconhecida ou pedido maior que 4.000 caracteres. Não corta o pedido silenciosamente: orienta resumir se o histórico ultrapassar esse limite.
 
@@ -44,7 +46,7 @@ No destino, reconfere a conta ativa e usa o upload existente `retocar-asset/sour
 
 Se V4 estiver sem edição por IA, a imagem ainda abre nos ajustes gratuitos e o pedido fica visível com a indisponibilidade explicada. Não habilita o motor pago nem muda flags. Se os editores legados estiverem selecionados, o handoff usa V3 quando ativo ou a pós-produção gratuita do V4, que aceitam imagem inicial.
 
-Não há migration, novos limites de gastos ou liberação para clientes. A evidência de interface usa componentes reais com serviços simulados para verificar preenchimento, revisão e falhas sem debitar Nodes. A nova decisão ainda precisa de revalidação com os provedores após a renovação da cota diária interna; não se zera o contador para testar.
+Não há migration, novos limites de gastos ou liberação para clientes. Os testes automatizados usam modelos simulados para verificar recuperação, validação, orçamento e falhas sem gastar créditos. A validação real da versão deve ser registrada com `qa=true` e identificadores v6, respeitando o saldo existente. Não confirme geração ou edição paga para verificar a revisão.
 
 ## Medição e limites da evidência
 
@@ -58,7 +60,9 @@ Não há migration, novos limites de gastos ou liberação para clientes. A evid
 | `applied` | `v2_action_confirmed` | aplicação informada pelo navegador após revisão |
 | `generated` | `v2_action_confirmed` | render concluído verificado no servidor e pertencente à conta |
 
-Filtre `meta.source='first-image-pilot'` e `meta.experiment='2026-10-20-v5'`. Compare `meta.provider` (`grok`/`control`) por `case_id`; deduplique respostas por `request_id` e observações por `(request_id,stage,render_id)`. O recibo assinado vincula conta, caso, resposta, braço e marca QA, com validade de 1 hora. A rota pública de telemetria não pode preencher os identificadores do experimento.
+Filtre `meta.source='first-image-pilot'` e `meta.experiment='2026-10-21-v6'`. `control` continua identificando Gemini para preservar o histórico; é o padrão também quando a API recebe o campo `variant` omitido. Compare braços por `case_id`; deduplique respostas por `request_id` e observações por `(request_id,stage,render_id)`. O recibo assinado vincula conta, caso, resposta, braço e marca QA, com validade de 1 hora. A rota pública de telemetria não pode preencher os identificadores do experimento nem as métricas de recuperação.
+
+`attempts` informa quantas chamadas foram iniciadas; `recovered_from` classifica a primeira falha recuperada; `retry_budget` indica reserva recusada/indisponível. `tokens_in`, `tokens_out` e custo nominal somam o uso conhecido das tentativas, inclusive saídas inválidas. `cost_estimate_complete=false` indica tentativa sem uso retornado: o custo registrado é parcial, nunca prova de gratuidade. São somente códigos e números; não há prompts, respostas brutas, credenciais ou imagens nos eventos.
 
 `qa=true` é o padrão e deve ficar excluído de métricas de usuários reais. `config_changed=true` distingue revisão/ajustes posteriores da proposta original. A atribuição cobre a primeira geração da referência na mesma sessão preparada: troca, recorte, desfazer recorte e novo render a limpam; reload/rascunho retomado ou recibo vencido deixam a atribuição desconhecida. Observações são best effort; ausência não prova abandono.
 

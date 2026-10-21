@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { parsePilotRequest, pilotPreparation, pilotConfigurationKey, type PilotContext } from '@/lib/nodi/first-image/contract'
+import { DEFAULT_PILOT_VARIANT, parsePilotRequest, pilotPreparation, pilotConfigurationKey, type PilotContext } from '@/lib/nodi/first-image/contract'
 import { sealPilotReceipt, openPilotReceipt } from '@/lib/nodi/first-image/receipt'
 import { checkPilotBudget } from '@/lib/nodi/first-image/budget'
 import { sanitizeClientEventMeta, sanitizeEventMeta } from '@/lib/nodi/telemetry'
@@ -14,6 +14,12 @@ const request = () => ({ variant: 'grok', caseId, message: 'Apresentar ao client
 afterEach(() => vi.unstubAllEnvs())
 
 describe('first-image pilot boundaries', () => {
+  it('defaults to Gemini on the server while preserving explicit comparison arms', () => {
+    expect(DEFAULT_PILOT_VARIANT).toBe('control')
+    expect(parsePilotRequest({ ...request(), variant: undefined })?.variant).toBe('control')
+    expect(parsePilotRequest(request())?.variant).toBe('grok')
+    expect(parsePilotRequest({ ...request(), variant: null })).toBeNull()
+  })
   it('picks only supported input and ignores browser provider, tool and image URL overrides', () => {
     const parsed = parsePilotRequest({ ...request(), model: 'expensive', provider: 'other', imageUrl: 'http://localhost', tools: ['gerar'] })!
     expect(Object.keys(parsed).sort()).toEqual(['attachmentId', 'caseId', 'context', 'history', 'message', 'variant'])
@@ -45,7 +51,7 @@ describe('first-image pilot boundaries', () => {
     const key = pilotConfigurationKey(c, EMPTY_MATERIALS, {}, '')
     expect(pilotConfigurationKey({ ...c }, { ...EMPTY_MATERIALS }, {}, '  ')).toBe(key)
     expect(pilotConfigurationKey({ ...c, fixtureLights: 'off' }, EMPTY_MATERIALS, {}, '')).not.toBe(key)
-    const forged = { source: 'first-image-pilot', experiment: 'v1', qa: false, case_id: caseId, render_id: requestId, config_changed: false, provider: 'grok', question: 'private' }
+    const forged = { source: 'first-image-pilot', experiment: 'v1', qa: false, case_id: caseId, render_id: requestId, config_changed: false, provider: 'grok', question: 'private', attempts: 2, recovered_from: 'http-503', retry_budget: 'limited', cost_estimate_complete: true }
     expect(sanitizeClientEventMeta(forged)).toEqual({ provider: 'grok' })
     expect(sanitizeEventMeta(forged)).toMatchObject({ experiment: 'v1', qa: false })
     expect(sanitizeEventMeta(forged)).not.toHaveProperty('question')

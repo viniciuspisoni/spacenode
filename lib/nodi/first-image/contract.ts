@@ -2,9 +2,11 @@ import { ONBOARDING_GOALS, type OnboardingGoal } from '@/lib/onboarding'
 import { FIRST_IMAGE_MATERIAL_FIELDS, firstImageRecommendation, type FirstImageRecommendation } from '@/lib/onboarding/first-image'
 import { PRESERVE, getLighting, type ProjectMaterials, type ProjectType } from '@/lib/prompts'
 
-export const FIRST_IMAGE_PILOT_VERSION = '2026-10-20-v5'
+export const FIRST_IMAGE_PILOT_VERSION = '2026-10-21-v6'
 export const PILOT_VARIANTS = ['grok', 'control'] as const
 export type PilotVariant = typeof PILOT_VARIANTS[number]
+// Keep the historical arm ID so previous comparisons retain their attribution.
+export const DEFAULT_PILOT_VARIANT: PilotVariant = 'control'
 export const PILOT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export interface PilotContext {
   projectType: ProjectType
@@ -49,7 +51,8 @@ const object = (value: unknown): Record<string, unknown> | null => value !== nul
 /** No provider, tool, URL, credential or arbitrary model can be selected by the browser. */
 export function parsePilotRequest(value: unknown): PilotRequest | null {
   const b = object(value), c = object(b?.context)
-  if (!b || !c || !PILOT_VARIANTS.includes(b.variant as PilotVariant) || typeof b.caseId !== 'string' || !PILOT_UUID.test(b.caseId) ||
+  const variant = b?.variant === undefined ? DEFAULT_PILOT_VARIANT : b.variant
+  if (!b || !c || !PILOT_VARIANTS.includes(variant as PilotVariant) || typeof b.caseId !== 'string' || !PILOT_UUID.test(b.caseId) ||
     typeof b.message !== 'string' || !b.message.trim() || b.message.length > 900 ||
     typeof b.attachmentId !== 'string' || !/^[A-Za-z0-9_-]{60,1024}$/.test(b.attachmentId) ||
     !['interior', 'exterior'].includes(String(c.projectType)) || !['model', 'photo', 'render'].includes(String(c.referenceKind)) ||
@@ -61,7 +64,7 @@ export function parsePilotRequest(value: unknown): PilotRequest | null {
     if (!t || !['user', 'assistant'].includes(String(t.role)) || typeof t.text !== 'string' || t.text.length > 1400) return null
     history.push({ role: t.role as PilotTurn['role'], text: t.text })
   }
-  return { variant: b.variant as PilotVariant, caseId: b.caseId, message: b.message.trim(), attachmentId: b.attachmentId,
+  return { variant: variant as PilotVariant, caseId: b.caseId, message: b.message.trim(), attachmentId: b.attachmentId,
     context: { projectType: c.projectType as ProjectType, goal: c.goal as OnboardingGoal | null, referenceKind: c.referenceKind as PilotContext['referenceKind'], qa: c.qa }, history }
 }
 
