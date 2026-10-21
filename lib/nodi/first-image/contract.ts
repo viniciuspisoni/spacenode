@@ -2,7 +2,7 @@ import { ONBOARDING_GOALS, type OnboardingGoal } from '@/lib/onboarding'
 import { FIRST_IMAGE_MATERIAL_FIELDS, firstImageRecommendation, type FirstImageRecommendation } from '@/lib/onboarding/first-image'
 import { PRESERVE, getLighting, type ProjectMaterials, type ProjectType } from '@/lib/prompts'
 
-export const FIRST_IMAGE_PILOT_VERSION = '2026-10-21-v6'
+export const FIRST_IMAGE_PILOT_VERSION = '2026-10-21-v7'
 export const PILOT_VARIANTS = ['grok', 'control'] as const
 export type PilotVariant = typeof PILOT_VARIANTS[number]
 // Keep the historical arm ID so previous comparisons retain their attribution.

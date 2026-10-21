@@ -1373,7 +1373,7 @@ export function FinalizeEditor({
   const croppedH = Math.round((crop?.h ?? 1) * doc.height)
 
   return (
-    <div className={recovery ? recoveryStyles.editor : undefined} style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+    <div className={recovery || reviewBeforeEdit ? recoveryStyles.editor : undefined} style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       <TopBar
         name={name}
         onName={(n) => { setName(n); markDirty() }}
@@ -1399,10 +1399,10 @@ export function FinalizeEditor({
         error={error}
       />
 
-      <div className={recovery ? recoveryStyles.workspace : undefined} style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+      <div className={recovery || reviewBeforeEdit ? recoveryStyles.workspace : undefined} style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         <ToolRail tool={tool} onTool={setTool} aiEnabled={aiEnabled} />
 
-        <div className={recovery ? recoveryStyles.canvas : undefined} style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0, display: 'flex' }}>
+        <div className={recovery || reviewBeforeEdit ? recoveryStyles.canvas : undefined} style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0, display: 'flex' }}>
         {tool === 'edit' && (
           <EditToolRail
             tool={editSubTool}
