@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '30 de setembro de 2026'
+const UPDATED_AT = '21 de outubro de 2026'
 
 export default function PrivacidadePage() {
   return (
@@ -40,7 +40,9 @@ export default function PrivacidadePage() {
           cadastro, as imagens que você envia e registros técnicos de uso. Suas imagens são processadas por
           provedores de IA contratados <Strong>apenas para gerar os seus resultados</Strong>; não usamos seu
           conteúdo para treinar modelos próprios nem vendemos dados. Pagamentos ficam com a Stripe. Cookies
-          de marketing de terceiros (Google e Meta) só carregam se você aceitar no aviso de cookies. Este
+          de marketing de terceiros (Google e Meta) só carregam se você aceitar no aviso de cookies.
+          Imagens geradas integralmente com nodes grátis de teste ou cortesia podem ser usadas na
+          divulgação da SpaceNode após o seu aceite expresso da autorização da cláusula 8 dos Termos. Este
           resumo não substitui o texto completo abaixo.
         </>
       }
@@ -118,6 +120,12 @@ export default function PrivacidadePage() {
             alteradas na página Conta. Informar o número não autoriza automaticamente esses contatos.
           </LI>
           <LI>
+            <Strong>Divulgação da SpaceNode</Strong> — publicar imagens geradas integralmente com nodes
+            grátis de teste ou cortesia, nas condições da cláusula 8 dos Termos de Uso, mediante aceite
+            expresso prévio dessa autorização. A divulgação não inclui dados pessoais identificáveis nem
+            conteúdo confidencial; o simples aceite de cookies não autoriza a publicação de imagens.
+          </LI>
+          <LI>
             <Strong>Cumprimento de obrigações legais</Strong>, fiscais e de ordens de autoridades (obrigação
             legal).
           </LI>
@@ -140,8 +148,12 @@ export default function PrivacidadePage() {
         <P>
           <Strong>Não usamos o seu conteúdo para treinar modelos de IA próprios</Strong>, e contratamos os
           provedores em modalidades que, conforme os termos deles, não utilizam conteúdo de clientes para
-          treinamento de seus modelos. Seus projetos são privados por padrão e não são exibidos publicamente
-          sem uma ação sua.
+          treinamento de seus modelos. Seus arquivos de origem e projetos são privados por padrão.
+          A divulgação de imagens geradas com nodes grátis de teste ou cortesia depende do aceite
+          expresso prévio da autorização da cláusula 8 dos Termos de Uso e pode começar imediatamente
+          após a geração, sem nova autorização para cada imagem. Imagens anteriores ao aceite, geradas
+          com nodes pagos, de assinatura, de indicação ou com saldo misto, e vídeos dependem de
+          autorização específica.
         </P>
       </LegalSection>
 
@@ -159,6 +171,12 @@ export default function PrivacidadePage() {
           Esses provedores atuam sob contratos com deveres de proteção de dados. Também podemos compartilhar
           dados quando exigido por lei ou por ordem de autoridade competente. <Strong>Não vendemos dados
           pessoais</Strong> e não compartilhamos seu conteúdo para publicidade de terceiros.
+        </P>
+        <P>
+          As imagens autorizadas para divulgação da SpaceNode podem ser publicadas no site, nas redes
+          sociais, em anúncios pagos, apresentações e materiais institucionais da própria Plataforma.
+          Essa publicação torna as imagens públicas nesses canais, nos limites da autorização concedida;
+          não inclui os arquivos de origem, dados pessoais identificáveis ou conteúdo confidencial.
         </P>
       </LegalSection>
 
@@ -232,7 +250,9 @@ export default function PrivacidadePage() {
         </UL>
         <P>
           Para exercer seus direitos, fale com a gente pelos canais da cláusula 12. Responderemos nos prazos
-          da LGPD. Você também pode apresentar petição à Autoridade Nacional de Proteção de Dados (ANPD).
+          da LGPD. Para revogar a autorização de divulgação de imagens, utilize esses mesmos canais;
+          após o pedido, interromperemos novos usos e retiraremos as imagens dos canais sob nosso
+          controle. Você também pode apresentar petição à Autoridade Nacional de Proteção de Dados (ANPD).
         </P>
       </LegalSection>
 

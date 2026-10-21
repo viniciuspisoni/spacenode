@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const UPDATED_AT = '15 de outubro de 2026'
+const UPDATED_AT = '21 de outubro de 2026'
 
 export default function TermosPage() {
   return (
@@ -34,6 +34,9 @@ export default function TermosPage() {
           Resumo em linguagem simples: a SpaceNode gera <Strong>visualizações arquitetônicas com IA</Strong> a
           partir do material que você envia. As imagens geradas são suas, mas têm natureza{' '}
           <Strong>ilustrativa</Strong> — não substituem projeto técnico nem responsabilidade profissional.
+          Imagens geradas integralmente com <Strong>nodes grátis de teste ou cortesia</Strong> podem ser
+          usadas imediatamente na divulgação da SpaceNode, após o seu <Strong>aceite expresso da
+          autorização da cláusula 8</Strong>.
           Os créditos do plano renovam todo mês e <Strong>acumulam enquanto a assinatura estiver
           ativa</Strong>; após o cancelamento, o saldo restante fica disponível por mais{' '}
           {NODES_GRACE_DAYS} dias. O plano anual é pago antecipadamente. Este resumo não substitui o
@@ -132,7 +135,8 @@ export default function TermosPage() {
           </LI>
           <LI>
             Contas gratuitas podem receber créditos de cortesia, cuja quantidade e disponibilidade podem ser
-            alteradas ou descontinuadas a qualquer momento, sem gerar direito adquirido.
+            alteradas ou descontinuadas a qualquer momento, sem gerar direito adquirido. A autorização
+            para divulgar imagens geradas com esses nodes segue as condições da cláusula 8.
           </LI>
           <LI>
             No <Strong>plano anual</Strong>, o valor total é cobrado antecipadamente e o compromisso é de 12
@@ -185,8 +189,9 @@ export default function TermosPage() {
           (&ldquo;Conteúdo do Usuário&rdquo;). Ao enviá-los, você nos concede uma licença limitada, não
           exclusiva e revogável para armazenar, processar, reproduzir tecnicamente e transmitir esse conteúdo
           aos provedores de tecnologia contratados, exclusivamente na medida necessária para operar a
-          Plataforma e prestar o serviço. Não usamos seus projetos em publicidade ou material promocional sem
-          a sua autorização expressa.
+          Plataforma e prestar o serviço. Os arquivos de origem enviados por você não são utilizados em
+          publicidade sem autorização específica. Para as imagens geradas com nodes grátis de teste ou
+          cortesia, aplica-se a autorização expressa descrita na cláusula 8.
         </P>
         <P>
           Você declara e garante que possui os direitos necessários sobre todo o conteúdo que envia e que o
@@ -198,11 +203,38 @@ export default function TermosPage() {
         </P>
       </LegalSection>
 
-      <LegalSection n={8} title="Imagens geradas e uso profissional">
+      <LegalSection n={8} title="Imagens geradas, uso profissional e divulgação">
         <P>
           Os direitos sobre as imagens e vídeos gerados a partir do seu conteúdo pertencem a você, na máxima
           extensão permitida pela legislação aplicável, para uso em apresentações comerciais, portfólio,
           redes sociais, sites e materiais de apoio ao projeto.
+        </P>
+        <Callout>
+          <Strong>Divulgação de imagens geradas com nodes grátis.</Strong> Mediante o seu aceite expresso
+          desta autorização, as imagens geradas integralmente com nodes disponibilizados gratuitamente
+          para teste ou cortesia podem ser utilizadas pela SpaceNode <Strong>imediatamente após a
+          geração</Strong> para divulgar a própria Plataforma, sem necessidade de solicitar uma nova
+          autorização para cada imagem.
+        </Callout>
+        <P>
+          A autorização concede à SpaceNode uma licença não exclusiva, gratuita e de alcance mundial para
+          reproduzir, publicar e exibir essas imagens em seu site, redes sociais, anúncios pagos,
+          apresentações e materiais institucionais. Permite também recortes, ajustes de formato e inclusão
+          da marca SpaceNode, preservando a integridade do conteúdo e os direitos do Usuário. A licença
+          vigora até a sua revogação, sem transferir a titularidade da imagem nem impedir o seu próprio uso.
+        </P>
+        <P>
+          Esta autorização abrange somente imagens geradas após o aceite expresso desta cláusula. Não
+          abrange arquivos de origem, vídeos, imagens anteriores ao aceite ou imagens geradas com nodes
+          pagos, de assinatura, de indicação ou com saldo que combine nodes gratuitos e pagos; nesses
+          casos, a divulgação depende de autorização específica. A contratação posterior de um plano não
+          altera a origem dos nodes usados na geração.
+        </P>
+        <P>
+          A divulgação não inclui dados pessoais identificáveis, conteúdo confidencial ou materiais que
+          violem direitos de terceiros. A licença alcança apenas os direitos que você pode validamente
+          autorizar, conforme a cláusula 7. Você pode revogá-la pelos canais da cláusula 18; após o pedido,
+          interromperemos novos usos e retiraremos as imagens dos canais sob nosso controle.
         </P>
         <Callout>
           As imagens geradas são <Strong>visualizações conceituais e ilustrativas</Strong>. Elas não
@@ -308,6 +340,10 @@ export default function TermosPage() {
           relevantes serão comunicadas com antecedência razoável, por e-mail ou aviso na Plataforma. O uso
           continuado após a entrada em vigor vale como concordância; se você não concordar, pode cancelar e
           encerrar sua conta.
+        </P>
+        <P>
+          A autorização de divulgação da cláusula 8 exige aceite expresso próprio. O simples uso continuado
+          da Plataforma não substitui esse aceite nem autoriza retroativamente imagens já geradas.
         </P>
       </LegalSection>
 
