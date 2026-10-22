@@ -8,7 +8,7 @@ import { pilotPreparation } from '@/lib/nodi/first-image/contract'
 import { PilotRunError } from '@/lib/nodi/first-image/failure'
 
 const mock = vi.hoisted(() => ({
-  user: { id: 'owner' } as { id: string } | null, enabled: true, budget: 'allowed', private: true,
+  user: { id: 'owner' } as { id: string } | null, enabled: true, internalTools: true, budget: 'allowed', private: true,
   list: vi.fn(), download: vi.fn(), agent: vi.fn(), log: vi.fn(), render: vi.fn(), renderOwner: vi.fn(), checkBudget: vi.fn(),
 }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ auth: { getUser: async () => ({ data: { user: mock.user } }) },
@@ -17,7 +17,7 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ auth: { g
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({ storage: {
   getBucket: async () => ({ data: { public: !mock.private }, error: null }), from: () => ({ list: mock.list, download: mock.download }),
 } }) }))
-vi.mock('@/lib/nodi/first-image/access', () => ({ canUseFirstImagePilot: async () => mock.enabled }))
+vi.mock('@/lib/nodi/first-image/access', () => ({ canUseFirstImagePilot: async () => mock.enabled, getFirstImageAccess: async () => ({ enabled: mock.enabled, internalTools: mock.internalTools }) }))
 vi.mock('@/lib/nodi/first-image/budget', () => ({ checkPilotBudget: (...args: unknown[]) => { mock.checkBudget(...args); return mock.budget } }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: async () => ({ allowed: true }) }))
 vi.mock('@/lib/nodi/telemetry', () => ({ logNodiEvent: mock.log }))
@@ -30,7 +30,7 @@ const input = () => ({ variant: 'grok', caseId, message: 'Apresentar ao cliente'
 const receipt = (owner = 'owner') => sealPilotReceipt({ userId: owner, caseId, requestId, variant: 'grok', qa: true })
 beforeEach(async () => {
   vi.stubEnv('NODI_ACTION_SECRET', 'pilot-route-test')
-  Object.assign(mock, { user: { id: 'owner' }, enabled: true, budget: 'allowed', private: true })
+  Object.assign(mock, { user: { id: 'owner' }, enabled: true, internalTools: true, budget: 'allowed', private: true })
   vi.clearAllMocks()
   const image = await sharp({ create: { width: 2000, height: 1000, channels: 3, background: '#ddd' } }).png().toBuffer()
   mock.list.mockResolvedValue({ data: [{ name: 'a'.repeat(32) + '.png', metadata: { size: image.length, mimetype: 'image/png' } }], error: null })
@@ -42,6 +42,21 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllEnvs())
 
 describe('authenticated first-image API', () => {
+  it('refuses customer-selected Grok before reserving budget or reading an image', async () => {
+    mock.internalTools = false
+    expect((await POST(request(input()))).status).toBe(403)
+    expect(mock.checkBudget).not.toHaveBeenCalled()
+    expect(mock.download).not.toHaveBeenCalled()
+    expect(mock.agent).not.toHaveBeenCalled()
+  })
+  it('pins customer preparation to Gemini and records customer usage even if QA is forged', async () => {
+    mock.internalTools = false
+    const response = await POST(request({ ...input(), variant: undefined }))
+    expect(response.status).toBe(200)
+    expect((await response.json()).answer).toMatchObject({ variant: 'control', modelLabel: 'Gemini 2.5 Flash' })
+    expect(mock.agent.mock.calls[0][0]).toMatchObject({ variant: 'control', context: { qa: false } })
+    expect(mock.log.mock.calls[0][1].meta).toMatchObject({ model: 'google/gemini-2.5-flash', provider: 'control', qa: false })
+  })
   it('routes finished renders away from AI before upload lookup or quota reservation', async () => {
     const response = await POST(request({ ...input(), context: { ...context, referenceKind: 'render' } }))
     expect(response.status).toBe(409)

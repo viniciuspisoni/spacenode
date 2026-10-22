@@ -39,6 +39,15 @@ describe('bounded native-vision pilot decision', () => {
     const answer = await run(modelFor({ ...decision, goal: 'lighting', lighting: 'Golden Hour' }), { ...input, context: { ...input.context, goal: 'lighting' } })
     expect(answer.recommendation).toMatchObject({ materialChange: null, config: { lighting: 'Golden Hour', fixtureLights: 'preserve' } })
   })
+  it.each(['presentation', 'materials'] as const)('preserves explicitly requested daylight with the main goal %s', async goal => {
+    const model = modelFor({ ...decision, goal, lighting: 'Diurno', materialField: goal === 'materials' ? 'fachada' : null, material: goal === 'materials' ? 'freijó fosco' : null })
+    const answer = await run(model, { ...input, variant: 'control', message: 'Apresentar com luz diurna. Na fachada, freijó fosco.', context: { ...input.context, goal } })
+    expect(answer.recommendation?.config.lighting).toBe('Diurno')
+    expect(answer.recommendation?.goal).toBe(goal)
+    expect(answer.recommendation?.config.fixtureLights).toBe('preserve')
+    expect(answer.recommendation?.nodeCost).toBe(20)
+    expect(model.doGenerateCalls[0].prompt[0].content).toContain('Não descarte a luz solicitada por causa do objetivo')
+  })
   it('uses the catalog default when exploring light without a stated preference', async () => {
     const answer = await run(modelFor({ ...decision, kind: 'clarify', goal: 'lighting', message: 'Posso escolher?' }), { ...input, context: { ...input.context, goal: 'lighting' } })
     expect(answer.recommendation?.config.lighting).toBe('Diurno')

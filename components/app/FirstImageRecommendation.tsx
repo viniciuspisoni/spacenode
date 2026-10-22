@@ -16,9 +16,10 @@ export default function FirstImageRecommendation({ projectType, goal, materials,
   onClose: () => void; onApply: (recommendation: Recommendation) => void
 }) {
   const initialType = initialRecommendation?.config.projectType ?? projectType
+  const initialIntention = initialRecommendation?.goal ?? goal ?? 'presentation'
   const [type, setType] = useState(initialType)
-  const [intention, setIntention] = useState<OnboardingGoal>(initialRecommendation?.goal ?? goal ?? 'presentation')
-  const [light, setLight] = useState(initialRecommendation?.config.lighting ?? recommendedLighting(initialType))
+  const [intention, setIntention] = useState<OnboardingGoal>(initialIntention)
+  const [light, setLight] = useState(initialRecommendation?.config.lighting ?? (initialIntention === 'lighting' ? recommendedLighting(initialType) : PRESERVE))
   const [field, setField] = useState<keyof ProjectMaterials>(() => initialRecommendation?.materialChange?.field ?? FIRST_IMAGE_MATERIAL_FIELDS[initialType].find(item => materials[item.id]?.trim() || materialRefs[item.id])?.id ?? FIRST_IMAGE_MATERIAL_FIELDS[initialType][0].id)
   const [descriptions, setDescriptions] = useState<ProjectMaterials>(() => initialRecommendation?.materialChange ? { ...materials, [initialRecommendation.materialChange.field]: initialRecommendation.materialChange.value } : { ...materials })
   const recommendation = firstImageRecommendation({ projectType: type, goal: intention, lighting: light, materialField: field, material: descriptions[field], hasMaterialReference: !!materialRefs[field] })
@@ -29,15 +30,18 @@ export default function FirstImageRecommendation({ projectType, goal, materials,
       <p>Confirme o tipo de projeto e a intenção. Você verá a configuração antes de aplicar.</p>
       <fieldset><legend>Sua imagem mostra</legend><div className={styles.actions}>
         {(['interior', 'exterior'] as const).map(item => <button type="button" className="spn-pill" key={item} aria-pressed={type === item} onClick={() => {
-          setType(item); setLight(recommendedLighting(item)); setField(FIRST_IMAGE_MATERIAL_FIELDS[item][0].id)
+          setType(item); setLight(intention === 'lighting' ? recommendedLighting(item) : PRESERVE); setField(FIRST_IMAGE_MATERIAL_FIELDS[item][0].id)
         }}>{item === 'interior' ? 'Um interior' : 'Um exterior'}</button>)}
       </div></fieldset>
       <fieldset><legend>O que você quer fazer?</legend><div className={styles.actions}>
-        {(Object.keys(ONBOARDING_GOALS) as OnboardingGoal[]).map(item => <button type="button" className="spn-pill" key={item} aria-pressed={intention === item} onClick={() => setIntention(item)}>{ONBOARDING_GOALS[item].label}</button>)}
+        {(Object.keys(ONBOARDING_GOALS) as OnboardingGoal[]).map(item => <button type="button" className="spn-pill" key={item} aria-pressed={intention === item} onClick={() => {
+          if (item === 'lighting' && light === PRESERVE) setLight(recommendedLighting(type))
+          setIntention(item)
+        }}>{ONBOARDING_GOALS[item].label}</button>)}
       </div></fieldset>
-      {intention === 'lighting' && <label>Iluminação para explorar
+      <label>Iluminação
         <select className="spn-input" value={light} onChange={e => setLight(e.target.value)}>{getLighting(type, PRESERVE).map(item => <option key={item}>{item}</option>)}</select>
-      </label>}
+      </label>
       {intention === 'materials' && <>
         <label>Superfície<select className="spn-input" value={field} onChange={e => setField(e.target.value as keyof ProjectMaterials)}>{FIRST_IMAGE_MATERIAL_FIELDS[type].map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
         <label>Material desejado<input className="spn-input" value={descriptions[field] ?? ''} maxLength={4000} placeholder="Ex.: porcelanato bege fosco" onChange={e => setDescriptions(prev => ({ ...prev, [field]: e.target.value }))} /></label>

@@ -3,7 +3,7 @@ import sharp from 'sharp'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { canUseFirstImagePilot } from '@/lib/nodi/first-image/access'
+import { getFirstImageAccess } from '@/lib/nodi/first-image/access'
 import { checkPilotBudget } from '@/lib/nodi/first-image/budget'
 import { FIRST_IMAGE_PILOT_VERSION, parsePilotRequest } from '@/lib/nodi/first-image/contract'
 import { PILOT_MODELS, runFirstImagePilot } from '@/lib/nodi/first-image/agent'
@@ -20,21 +20,25 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401, headers })
   const admin = createAdminClient()
-  if (!await canUseFirstImagePilot(admin, user)) return NextResponse.json({ error: 'Piloto indisponível para esta conta.' }, { status: 404, headers })
+  const access = await getFirstImageAccess(admin, user)
+  if (!access.enabled) return NextResponse.json({ error: 'Preparo com Nodi indisponível para esta conta.' }, { status: 404, headers })
   if (req.headers.get('origin') !== new URL(req.url).origin) return NextResponse.json({ error: 'Origem não permitida' }, { status: 403, headers })
   if (!req.headers.get('content-type')?.startsWith('application/json')) return NextResponse.json({ error: 'Formato inválido' }, { status: 415, headers })
   const raw = await req.text()
-  if (raw.length > 24_000) return NextResponse.json({ error: 'Conversa muito longa. Recomece a comparação.' }, { status: 413, headers })
+  if (raw.length > 24_000) return NextResponse.json({ error: 'Conversa muito longa. Recomece a conversa.' }, { status: 413, headers })
   const input = parsePilotRequest((() => { try { return JSON.parse(raw) } catch { return null } })())
   if (!input) return NextResponse.json({ error: 'Confira o objetivo, o tipo de referência e a mensagem.' }, { status: 400, headers })
+  if (!access.internalTools && input.variant !== 'control') return NextResponse.json({ error: 'Modelo não disponível neste fluxo.' }, { status: 403, headers })
+  // Customers cannot select the comparison model or hide activity as QA.
+  if (!access.internalTools) input.context.qa = false
   // This routing choice needs no model, private upload or analysis quota.
   if (input.context.referenceKind === 'render') return NextResponse.json({ error: 'Sua imagem já é um render. Use Continuar em Editar com esta imagem; o pedido será levado para revisão.' }, { status: 409, headers })
   const key = openUpload(input.attachmentId, user.id)
   if (!key) return NextResponse.json({ error: 'A referência venceu ou não está disponível. Envie novamente.' }, { status: 400, headers })
   const budget = await checkPilotBudget(admin, user.id)
   if (budget !== 'allowed') return NextResponse.json({ error: budget === 'limited'
-    ? 'Limite de conversas do piloto atingido. Você pode continuar pelo Nodi padrão e pelos controles da referência.'
-    : 'Não foi possível conferir o limite do piloto agora. Os controles da referência continuam disponíveis.' }, { status: budget === 'limited' ? 429 : 503, headers })
+    ? 'Limite de análises atingido. Você pode continuar pelos controles da referência.'
+    : 'Não foi possível conferir o limite agora. Os controles da referência continuam disponíveis.' }, { status: budget === 'limited' ? 429 : 503, headers })
   const requestId = randomUUID()
   const meta = { source: 'first-image-pilot', experiment: FIRST_IMAGE_PILOT_VERSION, case_id: input.caseId, request_id: requestId,
     provider: input.variant, model: PILOT_MODELS[input.variant].id, qa: input.context.qa }

@@ -8,7 +8,7 @@ import { uploadPrint } from './upload-print'
 import { ONBOARDING_GOALS, type OnboardingGoal } from '@/lib/onboarding'
 import { PRESERVE, type ProjectType } from '@/lib/prompts'
 import { ENGINES } from '@/lib/engines'
-import { FIRST_IMAGE_MATERIAL_FIELDS } from '@/lib/onboarding/first-image'
+import { FIRST_IMAGE_MATERIAL_FIELDS, smallReference, type ImageSize } from '@/lib/onboarding/first-image'
 import { editHandoffIntention, saveEditHandoff } from '@/lib/onboarding/edit-handoff'
 import { DEFAULT_PILOT_VARIANT, type PilotAnswer, type PilotContext, type PilotTurn, type PilotVariant } from '@/lib/nodi/first-image/contract'
 import { observeFirstImagePilot } from '@/lib/nodi/first-image/client'
@@ -16,9 +16,10 @@ import styles from './FirstImagePilot.module.css'
 
 interface Message { role: 'user' | 'assistant'; text: string; answer?: PilotAnswer; helpful?: boolean }
 
-export default function FirstImagePilot({ file, previewUrl, projectType, goal, ownerId, onClose, onReview }: {
+export default function FirstImagePilot({ file, previewUrl, projectType, goal, ownerId, internalTools = false, referenceSize, onClose, onReview }: {
   file: File; previewUrl: string; projectType: ProjectType; goal: OnboardingGoal | null
   ownerId: string
+  internalTools?: boolean; referenceSize?: ImageSize
   onClose: () => void; onReview: (answer: PilotAnswer) => void
 }) {
   const router = useRouter()
@@ -27,7 +28,7 @@ export default function FirstImagePilot({ file, previewUrl, projectType, goal, o
   const [type, setType] = useState(projectType)
   const [intention, setIntention] = useState<OnboardingGoal | null>(goal)
   const [kind, setKind] = useState<'' | PilotContext['referenceKind']>('')
-  const [qa, setQa] = useState(true)
+  const [qa, setQa] = useState(internalTools)
   const [conversations, setConversations] = useState<Record<PilotVariant, Message[]>>({ grok: [], control: [] })
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -90,28 +91,29 @@ export default function FirstImagePilot({ file, previewUrl, projectType, goal, o
   }
   return <Sheet open title="Nodi · primeira imagem" onClose={onClose} doneLabel="Voltar à referência">
     <div className={styles.body}>
-      <div className={styles.intro}><NodiAvatar size={32} state={busy ? 'thinking' : 'idle'} /><div><strong>Piloto interno · Gemini como padrão</strong><p>O Nodi prepara sua primeira imagem com Gemini. A comparação com Grok continua disponível para testes da equipe, em conversa separada.</p></div></div>
+      <div className={styles.intro}><NodiAvatar size={32} state={busy ? 'thinking' : 'idle'} /><div><strong>Sua imagem, com os ajustes prontos</strong><p>Conte o que você quer alcançar. O Nodi prepara a configuração para você revisar antes de gerar.</p></div></div>
       <div className={styles.reference}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={previewUrl} alt="Referência desta comparação" />
-        <p>A mesma referência nas duas opções. O arquivo completo continua disponível em Renderizar.</p>
+        <img src={previewUrl} alt="Sua imagem de referência" />
+        <p>O arquivo original continua disponível em Renderizar.</p>
       </div>
+      {referenceSize && smallReference(referenceSize) && <p className={styles.caption}>Esta referência tem poucos pixels ({referenceSize.width} × {referenceSize.height}). Uma vista maior pode ajudar a ler os detalhes. Você pode continuar com esta imagem.</p>}
       <fieldset disabled={locked || started} className={styles.context}><legend>Confirme sua referência</legend>
         <label>Origem da imagem<select className="spn-input" value={kind} onChange={e => setKind(e.target.value as typeof kind)}><option value="">Escolha uma opção</option><option value="model">Vista de um modelo 3D</option><option value="photo">Foto do espaço</option><option value="render">Render já pronto</option></select></label>
         <label>Tipo de projeto<select className="spn-input" value={type} onChange={e => setType(e.target.value as ProjectType)}><option value="interior">Interior</option><option value="exterior">Exterior</option></select></label>
         <label>Objetivo<select className="spn-input" value={intention ?? ''} onChange={e => setIntention((e.target.value || null) as OnboardingGoal | null)}><option value="">Quero ajuda para definir</option>{Object.entries(ONBOARDING_GOALS).map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}</select></label>
-        <label className={styles.check}><input type="checkbox" checked={qa} onChange={e => setQa(e.target.checked)} />Conversa de teste técnico; excluir da medição de usuários reais</label>
+        {internalTools && <label className={styles.check}><input type="checkbox" checked={qa} onChange={e => setQa(e.target.checked)} />Conversa de teste técnico; excluir da medição de usuários reais</label>}
       </fieldset>
-      {started && <button type="button" className="spn-pill" disabled={locked} onClick={() => { setCaseId(''); setConversations({ grok: [], control: [] }); setError(''); setInput('') }}>Recomeçar comparação</button>}
-      {kind !== 'render' && <div className={styles.variants} role="group" aria-label="Modelo da comparação">{(['control', 'grok'] as const).map(item => <button type="button" className="spn-pill" key={item} disabled={locked} aria-pressed={variant === item} onClick={() => {
+      {started && <button type="button" className="spn-pill" disabled={locked} onClick={() => { setCaseId(''); setConversations({ grok: [], control: [] }); setError(''); setInput('') }}>Recomeçar conversa</button>}
+      {internalTools && kind !== 'render' && <details><summary>Comparação de modelos · equipe</summary><div className={styles.variants} role="group" aria-label="Modelo da comparação">{(['control', 'grok'] as const).map(item => <button type="button" className="spn-pill" key={item} disabled={locked} aria-pressed={variant === item} onClick={() => {
         if (item === variant) return
         if (!input.trim() && !conversations[item].length) setInput(messages.find(m => m.role === 'user')?.text ?? '')
         setVariant(item); setError('')
-      }}>{item === 'grok' ? 'Grok · comparação' : 'Gemini · padrão'}</button>)}</div>}
-      <p className={styles.caption}>{kind === 'render' ? 'Sua imagem já está pronta. Leve-a direto para Editar com seu pedido, sem esperar uma análise de IA.' : 'Ao enviar, a referência e esta conversa serão analisadas pelo modelo escolhido. Use JPG, PNG ou WebP de até 8 MB. Você revisa os ajustes antes de aplicar e confere o custo antes de gerar.'}</p>
+      }}>{item === 'grok' ? 'Grok · comparação' : 'Gemini · padrão'}</button>)}</div></details>}
+      <p className={styles.caption}>{kind === 'render' ? 'Sua imagem já está pronta. Leve-a direto para Editar com seu pedido, sem esperar uma análise de IA.' : 'Ao enviar, sua referência e esta conversa serão analisadas por IA. Use JPG, PNG ou WebP de até 8 MB. Você revisa os ajustes antes de aplicar e confere o custo antes de gerar.'}</p>
       <div className={styles.thread} aria-live="polite" aria-label={`Conversa com ${variant === 'grok' ? 'Grok' : 'Gemini'}`}>
         {messages.map((m, i) => <article key={`${variant}:${i}`} className={m.role === 'user' ? styles.user : styles.answer}>
-          <strong>{m.role === 'user' ? 'Você' : `Nodi · ${m.answer?.modelLabel ?? ''}`}</strong><p>{m.text}</p>
+          <strong>{m.role === 'user' ? 'Você' : internalTools ? `Nodi · ${m.answer?.modelLabel ?? ''}` : 'Nodi'}</strong><p>{m.text}</p>
           {m.answer?.recommendation && <>
             <dl className={styles.summary} aria-label="Configuração preparada">
               <div><dt>Objetivo</dt><dd>{ONBOARDING_GOALS[m.answer.recommendation.goal].label}</dd></div>
