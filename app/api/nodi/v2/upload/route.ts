@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isNodiEnabled } from '@/lib/nodi/flags'
 import { capabilitiesFor, isNodiV2EnabledFor } from '@/lib/nodi/v2/flags'
+import { canUseFirstImagePilot } from '@/lib/nodi/first-image/access'
 import { rateLimit } from '@/lib/rate-limit'
 import { NODI_UPLOAD_BUCKET, NODI_UPLOAD_MAX_BYTES, NODI_UPLOAD_MIMES,
   newUploadKey, validUploadKey, validatePrint, sealUpload } from '@/lib/nodi/v2/uploads'
@@ -15,10 +16,15 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   const admin = createAdminClient()
-  if (!await isNodiV2EnabledFor(admin, user) || !capabilitiesFor(true).multimodal) {
+  const v2Upload = await isNodiV2EnabledFor(admin, user) && capabilitiesFor(true).multimodal
+  if (!v2Upload && !await canUseFirstImagePilot(admin, user)) {
     return NextResponse.json({ error: 'Não disponível' }, { status: 404 })
   }
-  const body = await req.json().catch(() => null)
+  if (req.headers.get('origin') !== new URL(req.url).origin) return NextResponse.json({ error: 'Origem não permitida' }, { status: 403 })
+  if (!req.headers.get('content-type')?.startsWith('application/json')) return NextResponse.json({ error: 'Formato inválido' }, { status: 415 })
+  const raw = await req.text()
+  if (raw.length > 3000) return NextResponse.json({ error: 'Envio inválido' }, { status: 413 })
+  const body = (() => { try { return JSON.parse(raw) } catch { return null } })()
   const storage = admin.storage.from(NODI_UPLOAD_BUCKET)
 
   if (body?.step === 'sign') {

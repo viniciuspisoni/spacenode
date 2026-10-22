@@ -52,6 +52,7 @@ const FirstImagePilot = dynamic(() => import('@/components/nodi/FirstImagePilot'
 interface GenerateClientProps {
   userId?: string
   firstImagePilotEnabled?: boolean
+  firstImageInternalTools?: boolean
   /** Saldo total da bolsa (mensais + extras) — mesmo pool que o débito consome. */
   initialCredits:    number
   /** Motor Orion liberado pra ESTE usuário. Decidido no servidor (page.tsx:
@@ -292,7 +293,7 @@ function resolveInitialConfig(cfg: ProjectConfig | null | undefined) {
   }
 }
 
-export function GenerateClient({ userId, initialCredits, initialMaterials, initialConfig, initialSourceUrl, initialReview, returnTo, firstRender = false, showPlanOffer = false, orionEnabled = false, orionProvider, firstImagePilotEnabled = false }: GenerateClientProps) {
+export function GenerateClient({ userId, initialCredits, initialMaterials, initialConfig, initialSourceUrl, initialReview, returnTo, firstRender = false, showPlanOffer = false, orionEnabled = false, orionProvider, firstImagePilotEnabled = false, firstImageInternalTools = false }: GenerateClientProps) {
   const init = resolveInitialConfig(initialConfig)
   const fromSpacesNew = returnTo === 'spaces/new'
   const supabase = createClient()
@@ -1698,7 +1699,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
               }}>Preparar referência</button>
               {uncroppedFile && <button type="button" className="spn-pill" onClick={() => replacePreparedReference(uncroppedFile, 'undo')}>Desfazer recorte</button>}
               {!guideOpen && <button type="button" className="spn-pill" onClick={() => { setPilotReview(null); setSheet(null); setFirstImageSheet('recommendation') }}>Configuração recomendada</button>}
-              {firstImagePilotEnabled && !exampleReference && <button type="button" className="spn-pill" onClick={() => { setPilotReview(null); setSheet(null); setFirstImageSheet('pilot') }}>Preparar com Nodi · piloto</button>}
+              {firstImagePilotEnabled && !exampleReference && <button type="button" className="spn-pill" onClick={() => { setPilotReview(null); setSheet(null); setFirstImageSheet('pilot') }}>Preparar com Nodi</button>}
             </>}
           </div>}
           {!imagePreview && referenceConverting && <p role="status" className={firstImageStyles.warning}>Preparando a imagem para abrir…</p>}
@@ -1710,6 +1711,7 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
             onClose={() => { setPilotReview(null); setFirstImageSheet(null) }} onApply={applyFirstImageRecommendation} />}
           {firstImageSheet === 'pilot' && firstImagePilotEnabled && userId && !loading && sourceFile && imagePreview && <FirstImagePilot
             file={sourceFile} previewUrl={imagePreview} projectType={projectType} goal={onboardingGoal} ownerId={userId}
+            internalTools={firstImageInternalTools} referenceSize={referenceImage.size ?? undefined}
             onClose={() => setFirstImageSheet(null)} onReview={answer => { setPilotReview(answer); setFirstImageSheet('recommendation') }} />}
           {firstImageSheet === 'reference' && !loading && sourceFile && imagePreview && referenceImage.size && <ReferencePreparation file={sourceFile} previewUrl={imagePreview} size={referenceImage.size}
             onClose={() => setFirstImageSheet(null)} onApply={file => replacePreparedReference(file, 'crop')} />}

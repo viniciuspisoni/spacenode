@@ -4,7 +4,8 @@ import { DEFAULT_PILOT_VARIANT, parsePilotRequest, pilotPreparation, pilotConfig
 import { sealPilotReceipt, openPilotReceipt } from '@/lib/nodi/first-image/receipt'
 import { checkPilotBudget } from '@/lib/nodi/first-image/budget'
 import { sanitizeClientEventMeta, sanitizeEventMeta } from '@/lib/nodi/telemetry'
-import { canUseFirstImagePilot } from '@/lib/nodi/first-image/access'
+import { canUseFirstImagePilot, getFirstImageAccess } from '@/lib/nodi/first-image/access'
+import { isNodiV2EnabledFor } from '@/lib/nodi/v2/flags'
 const EMPTY_MATERIALS = { piso: '', fachada: '', paredes: '' }
 
 const caseId = 'aabbeedd-0000-4000-8000-000000000001'
@@ -85,6 +86,7 @@ describe('first-image pilot boundaries', () => {
     const user = { id: 'owner', user_metadata: { role: 'admin' } }
     for (const flag of ['NODI_ENABLED', 'NODI_V2_ENABLED', 'NODI_MULTIMODAL_ENABLED']) vi.stubEnv(flag, '1')
     vi.stubEnv('NODI_FIRST_IMAGE_PILOT_ENABLED', '')
+    vi.stubEnv('NODI_FIRST_IMAGE_PUBLIC_ENABLED', '')
     vi.stubEnv('INTERNAL_STAFF_EMAILS', '')
     expect(await canUseFirstImagePilot(admin, user)).toBe(false)
     expect(maybeSingle).not.toHaveBeenCalled()
@@ -92,5 +94,26 @@ describe('first-image pilot boundaries', () => {
     expect(await canUseFirstImagePilot(admin, user)).toBe(false)
     maybeSingle.mockResolvedValue({ data: { role: 'admin' }, error: null })
     expect(await canUseFirstImagePilot(admin, user)).toBe(true)
+  })
+  it('opens only first-image preparation for customers while keeping staff tools private', async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: { role: 'member' }, error: null })
+    const admin = { from: () => ({ select: () => ({ eq: () => ({ maybeSingle }) }) }) } as unknown as SupabaseClient
+    const user = { id: 'customer', user_metadata: { role: 'admin' } }
+    for (const flag of ['NODI_ENABLED', 'NODI_V2_ENABLED', 'NODI_MULTIMODAL_ENABLED', 'NODI_FIRST_IMAGE_PILOT_ENABLED', 'NODI_FIRST_IMAGE_PUBLIC_ENABLED']) vi.stubEnv(flag, '1')
+    vi.stubEnv('INTERNAL_STAFF_EMAILS', '')
+    vi.stubEnv('NODI_INTERNAL_USERS_ONLY', '1')
+    expect(await getFirstImageAccess(admin, user)).toEqual({ enabled: true, internalTools: false })
+    expect(await isNodiV2EnabledFor(admin, user)).toBe(false)
+    maybeSingle.mockResolvedValue({ data: { role: 'admin' }, error: null })
+    expect(await getFirstImageAccess(admin, user)).toEqual({ enabled: true, internalTools: true })
+    vi.stubEnv('NODI_FIRST_IMAGE_PUBLIC_ENABLED', '0')
+    maybeSingle.mockResolvedValue({ data: { role: 'member' }, error: null })
+    expect(await getFirstImageAccess(admin, user)).toEqual({ enabled: false, internalTools: false })
+  })
+  it.each(['NODI_ENABLED', 'NODI_V2_ENABLED', 'NODI_MULTIMODAL_ENABLED'])('fails closed when a required capability is disabled: %s', async disabled => {
+    const admin = {} as SupabaseClient
+    for (const flag of ['NODI_ENABLED', 'NODI_V2_ENABLED', 'NODI_MULTIMODAL_ENABLED', 'NODI_FIRST_IMAGE_PUBLIC_ENABLED']) vi.stubEnv(flag, '1')
+    vi.stubEnv(disabled, '0')
+    expect(await getFirstImageAccess(admin, { id: 'customer' })).toEqual({ enabled: false, internalTools: false })
   })
 })

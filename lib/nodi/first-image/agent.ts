@@ -25,7 +25,7 @@ Para estudar um material, descubra uma superfície e o material desejado, inclui
 Luzes válidas: ${getLighting(context.projectType, PRESERVE).join(', ')}.
 Superfícies: ${FIRST_IMAGE_MATERIAL_FIELDS[context.projectType].map(f => `${f.id} (${f.label})`).join(', ')}.
 Configuração inicial do catálogo: ${ENGINES[DEFAULT_ENGINE].name}, ${DEFAULT_RESOLUTION}, ${getNodesCost(DEFAULT_ENGINE, DEFAULT_RESOLUTION)} Nodes por geração. O saldo real será conferido na tela de gerar. Não calcule nem invente outro custo.
-A sugestão preserva ambiente, entorno e estado das luminárias, remove solicitações de elementos extras e mantém as outras descrições e amostras já preenchidas. A luz muda apenas no objetivo de explorar luz; materiais mudam apenas na superfície solicitada. Não prometa fidelidade perfeita ou resultado garantido.
+A sugestão preserva ambiente, entorno e estado das luminárias, remove solicitações de elementos extras e mantém as outras descrições e amostras já preenchidas. Se o usuário pedir uma luz específica, preencha lighting com a opção válida correspondente mesmo quando o objetivo principal for apresentar ou estudar material. Não descarte a luz solicitada por causa do objetivo. Sem pedido explícito de luz, retorne lighting=null, exceto no objetivo explorar luz, que usa os padrões acima. Materiais mudam apenas na superfície solicitada. Não prometa fidelidade perfeita ou resultado garantido.
 O usuário revisa antes de aplicar; Gerar render é uma confirmação separada. Depois da geração, a pergunta de utilidade continua sendo “Este render serviu para o seu projeto?”. Conclusão técnica, download e silêncio não confirmam utilidade. Não ofereça plano pago neste preparo.
 message serve apenas para perguntas quando kind=clarify; nas outras decisões deixe message vazio. Use null nos campos que não se aplicam. Não alegue ter recortado, aplicado, gerado ou executado nada.`
 }
@@ -109,7 +109,7 @@ export async function runFirstImagePilot(input: PilotRequest, image: Uint8Array,
   // requests always get a real proposal, even if the model asks redundant permission.
   const recommendation = !goal ? null : pilotPreparation({
     goal,
-    ...(goal === 'lighting' && decision.lighting ? { lighting: decision.lighting } : {}),
+    ...(decision.lighting ? { lighting: decision.lighting } : {}),
     ...(goal === 'materials' && decision.materialField ? { materialField: decision.materialField } : {}),
     ...(goal === 'materials' && decision.material ? { material: decision.material } : {}),
   }, input.context)

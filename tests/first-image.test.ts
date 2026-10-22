@@ -30,6 +30,13 @@ describe('primeira imagem: proposta explícita', () => {
   it('não aceita intenções desconhecidas', () => {
     expect(firstImageRecommendation({ projectType: 'interior', goal: 'inexistente' as 'presentation' })).toBeNull()
   })
+  it('mantém a luz explícita ao revisar uma apresentação sem trocar o objetivo', () => {
+    const proposal = firstImageRecommendation({ projectType: 'exterior', goal: 'presentation', lighting: 'Diurno' })!
+    expect(proposal.goal).toBe('presentation')
+    expect(proposal.config.lighting).toBe('Diurno')
+    expect(firstImageRecommendation({ projectType: 'exterior', goal: 'presentation', lighting: 'inventada' })?.config.lighting).toBe(PRESERVE)
+    expect(firstImageRecommendation({ projectType: 'exterior', goal: 'presentation' })?.config.lighting).toBe(PRESERVE)
+  })
 })
 
 describe('recorte da referência em pixels nativos', () => {

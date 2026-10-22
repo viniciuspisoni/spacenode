@@ -24,9 +24,8 @@ export function firstImageRecommendation(input: {
   const material = input.material?.trim().slice(0, 4000) ?? ''
   if (input.goal === 'materials' && (!field || (!material && !input.hasMaterialReference))) return null
   const options = getLighting(input.projectType, PRESERVE)
-  const light = input.goal === 'lighting'
-    ? options.includes(input.lighting ?? '') ? input.lighting! : recommendedLighting(input.projectType)
-    : PRESERVE
+  const light = options.includes(input.lighting ?? '') ? input.lighting!
+    : input.goal === 'lighting' ? recommendedLighting(input.projectType) : PRESERVE
   return {
     goal: input.goal,
     config: {

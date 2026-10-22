@@ -7,7 +7,7 @@ import { orionProvider, orionProviderReady } from '@/lib/orion/provider'
 import { ensureProfileRow } from '@/lib/profiles/ensure-profile'
 import GenerateClient from './GenerateClient'
 import { loadOwnSavedRenderReview } from '@/lib/ai/fidelity/saved-render-review'
-import { canUseFirstImagePilot } from '@/lib/nodi/first-image/access'
+import { getFirstImageAccess } from '@/lib/nodi/first-image/access'
 
 export default async function GeneratePage({
   searchParams,
@@ -38,7 +38,7 @@ export default async function GeneratePage({
     .eq('status', 'completed')
     .then(({ count }) => count ?? 0)
   const reviewPromise = loadOwnSavedRenderReview(supabase, user.id, sp.reuse)
-  const pilotPromise = canUseFirstImagePilot(admin, user)
+  const pilotPromise = getFirstImageAccess(admin, user)
 
   // Materiais/config são do PRÓPRIO usuário; o saldo exibido/gateado é da
   // bolsa (dono do workspace) — é dele que a geração debita.
@@ -59,7 +59,7 @@ export default async function GeneratePage({
     balance = await getPayerBalance(admin, user.id)
   }
 
-  const [renderCount, review, firstImagePilotEnabled] = await Promise.all([renderCountPromise, reviewPromise, pilotPromise])
+  const [renderCount, review, firstImageAccess] = await Promise.all([renderCountPromise, reviewPromise, pilotPromise])
 
   // Orion: mesmo gate da API (ORION_INTERNAL_ENABLED + usuário autenticado).
   // Checado AQUI, no servidor — o client só recebe um booleano já decidido, e
@@ -71,7 +71,8 @@ export default async function GeneratePage({
   return (
     <GenerateClient
       userId={user.id}
-      firstImagePilotEnabled={firstImagePilotEnabled}
+      firstImagePilotEnabled={firstImageAccess.enabled}
+      firstImageInternalTools={firstImageAccess.internalTools}
       key={`${user.id}:${review?.id ?? sp.source ?? 'new'}`}
       orionEnabled={orionAllowed}
       orionProvider={orionAllowed ? orionProvider() : undefined}
