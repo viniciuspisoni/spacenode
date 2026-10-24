@@ -11,7 +11,7 @@
 //     duração/formato ao que o motor selecionado realmente suporta —
 //     nunca enviamos parâmetro não suportado ao provider.
 
-import { requireVideoModel } from './models'
+import { DEFAULT_VIDEO_MODEL_ID, requireVideoModel } from './models'
 import type { CameraIntensity, CameraMotionId } from './cameraPresets'
 import type { FidelityMode } from './promptBuilder'
 
@@ -39,7 +39,7 @@ export interface VideoTypePreset {
   }
 }
 
-const VEO = 'fal-ai/veo3.1/image-to-video'
+const DEFAULT_ENGINE = DEFAULT_VIDEO_MODEL_ID
 
 export const VIDEO_TYPE_PRESETS: Record<VideoTypeId, VideoTypePreset> = {
   cinematic: {
@@ -48,9 +48,9 @@ export const VIDEO_TYPE_PRESETS: Record<VideoTypeId, VideoTypePreset> = {
     tagline:  'Movimento sutil e elegante para dar vida ao render.',
     useCases: 'Portfólio, apresentações e redes profissionais',
     defaults: {
-      modelId:      VEO,
+      modelId:      DEFAULT_ENGINE,
       motionId:     'auto',
-      duration:     '8',
+      duration:     '5',
       aspectRatio:  'auto',
       intensity:    'subtle',
       fidelityMode: 'max',
@@ -63,7 +63,7 @@ export const VIDEO_TYPE_PRESETS: Record<VideoTypeId, VideoTypePreset> = {
     tagline:  'Passagem suave pelo espaço, como uma visita guiada.',
     useCases: 'Interiores, decorados e imóveis à venda',
     defaults: {
-      modelId:      VEO,
+      modelId:      DEFAULT_ENGINE,
       motionId:     'walkthrough-interior',
       duration:     '8',
       aspectRatio:  '16:9',
@@ -78,7 +78,7 @@ export const VIDEO_TYPE_PRESETS: Record<VideoTypeId, VideoTypePreset> = {
     tagline:  'Vertical e dinâmico, pronto para Instagram e TikTok.',
     useCases: 'Reels, Stories e tráfego pago',
     defaults: {
-      modelId:      VEO,
+      modelId:      DEFAULT_ENGINE,
       motionId:     'social-loop',
       duration:     '6',
       aspectRatio:  '9:16',
@@ -93,7 +93,7 @@ export const VIDEO_TYPE_PRESETS: Record<VideoTypeId, VideoTypePreset> = {
     tagline:  'Sofisticado e limpo para apresentar ao cliente.',
     useCases: 'Propostas, reuniões e material de venda',
     defaults: {
-      modelId:      VEO,
+      modelId:      DEFAULT_ENGINE,
       motionId:     'auto',
       duration:     '8',
       aspectRatio:  '16:9',
@@ -108,7 +108,7 @@ export const VIDEO_TYPE_PRESETS: Record<VideoTypeId, VideoTypePreset> = {
     tagline:  'Valoriza materiais, luz, texturas e mobiliário.',
     useCases: 'Marcenaria, acabamentos e closes de produto',
     defaults: {
-      modelId:      VEO,
+      modelId:      DEFAULT_ENGINE,
       motionId:     'zoom-editorial',
       duration:     '4',
       aspectRatio:  'auto',
@@ -146,7 +146,7 @@ export function resolvePresetDefaults(preset: VideoTypePreset): VideoTypePreset[
 
   const duration = model.supportedDurations.includes(d.duration)
     ? d.duration
-    : model.supportedDurations[model.supportedDurations.length - 1]
+    : model.supportedDurations[0]
 
   const aspectRatio = model.supportedAspectRatios.includes(d.aspectRatio)
     ? d.aspectRatio

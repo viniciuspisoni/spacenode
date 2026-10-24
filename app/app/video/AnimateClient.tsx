@@ -1,5 +1,7 @@
 'use client'
 
+import './animar.css'
+
 // Root client do Animar.
 //
 // A casca é a `.spn-tool` do kit de vidro (globals.css): painel de config à
@@ -24,18 +26,19 @@ import { useImageUpload } from './_hooks/useImageUpload'
 import { useReferenceAnalysis } from './_hooks/useReferenceAnalysis'
 import { useVideoGeneration } from './_hooks/useVideoGeneration'
 import { useFrameExtractor } from './_hooks/useFrameExtractor'
-import { getVideoModel } from '@/lib/video/models'
+import { getVideoModel, listAvailableVideoModels } from '@/lib/video/models'
 import { isCameraMotionId } from '@/lib/video/cameraPresets'
-import { isVideoTypeId, VIDEO_TYPE_PRESETS } from '@/lib/video/videoPresets'
+import { isVideoTypeId } from '@/lib/video/videoPresets'
 import { EditV2ImportModal } from '@/components/editar/EditV2ImportModal'
 import { toMediaProxyUrl } from '@/lib/storage/media-url'
 
 interface AnimateClientProps {
   initialCredits: number
   initialSourceUrl?: string | null
+  availableModelIds?: string[]
 }
 
-export default function AnimateClient({ initialCredits, initialSourceUrl }: AnimateClientProps) {
+export default function AnimateClient({ initialCredits, initialSourceUrl, availableModelIds = listAvailableVideoModels().map(model => model.id) }: AnimateClientProps) {
   const importedSourceRef = useRef<string | null>(null)
   const { state, dispatch, model, resolvedMotion, nodeCost } = useAnimateState(initialCredits)
   const { analyze }  = useReferenceAnalysis(dispatch)
@@ -147,7 +150,7 @@ export default function AnimateClient({ initialCredits, initialSourceUrl }: Anim
   // restaura motor + duração.
   function handleReuseHistory(item: VideoHistoryItem) {
     const m = getVideoModel(item.style)
-    if (!m || !m.isAvailable) return
+    if (!m || !m.isAvailable || !availableModelIds.includes(m.id)) return
 
     const s = item.settings
     if (s?.video_type && isVideoTypeId(s.video_type)) {
@@ -171,10 +174,11 @@ export default function AnimateClient({ initialCredits, initialSourceUrl }: Anim
   }
 
   const configLine = summarize([
-    VIDEO_TYPE_PRESETS[state.videoType].label,
+    model.label,
     resolvedMotion.label,
     formatLabel(state.aspectRatio),
     `${state.duration}s`,
+    model.supportedResolutions[0],
   ])
 
   return (
@@ -191,6 +195,7 @@ export default function AnimateClient({ initialCredits, initialSourceUrl }: Anim
           resolvedMotion={resolvedMotion}
           nodeCost={nodeCost}
           onGenerate={generate}
+          availableModelIds={availableModelIds}
         />
 
         {/* Palco: o que está em foco (imagem, geração, resultado) e, embaixo,
