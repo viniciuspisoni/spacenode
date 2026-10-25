@@ -43,6 +43,21 @@
 .nextSteps > strong { font-size: 13px; }
 .nextSteps > p { margin: 14px 0 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.6; }
 .nextSteps a { font-size: 11px; }
+.planOffer { padding: 18px; margin-bottom: 20px; border: 1px solid var(--color-border-strong); border-radius: 16px; background: linear-gradient(135deg, var(--color-surface-hover), var(--color-bg-elevated)); }
+.planOfferHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.planOffer h3 { margin: 8px 0; font-size: 19px; font-weight: 560; line-height: 1.2; letter-spacing: -.035em; }
+.planOffer p { margin: 8px 0 0; color: var(--color-text-secondary); font-size: 12px; line-height: 1.6; }
+.planOfferPrice { display: grid; gap: 5px; margin-top: 16px; }
+.planOfferPrice > strong { font-size: 13px; font-weight: 560; }
+.planOfferPrice > span { font-size: 28px; letter-spacing: -.04em; font-variant-numeric: tabular-nums; font-weight: 560; }
+.planOfferPrice small { font-size: 12px; color: var(--color-text-secondary); font-weight: 400; letter-spacing: normal; margin-left: 3px; }
+.planOfferPrice p { margin: 0; }
+.planOffer .planOfferEstimate { font-size: 11px; }
+.planOfferActions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
+.planOfferActions a { font-size: 12px; text-align: center; }
+.planOfferActions button { font-size: 11px; }
+.planOffer .caption { font-size: 10px; }
+.planOffer :is(a, button):focus-visible { outline: 2px solid var(--color-text-primary); outline-offset: 3px; }
 .goalHelp { margin: 12px 0 0; padding: 12px; border-radius: 12px; background: var(--color-surface); color: var(--color-text-secondary); font-size: 12px; line-height: 1.6; }
 .goalHelp p { margin: 0 0 8px; }
 .exampleNotice { margin: 8px 0 0; font-size: 11px; color: var(--color-text-secondary); }

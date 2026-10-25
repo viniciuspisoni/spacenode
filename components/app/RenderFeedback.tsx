@@ -6,6 +6,7 @@ import ResultNextSteps from './ResultNextSteps'
 import type { RenderFeedbackInput, RenderFeedbackReason } from '@/lib/render-feedback'
 import { recoveryHref, RECOVERY_VERSION } from '@/lib/onboarding/render-recovery'
 import { track } from '@/lib/analytics/client'
+import { useResultExposure } from './useResultExposure'
 
 const REASONS: { id: RenderFeedbackReason; label: string }[] = [
   { id: 'geometry', label: 'Geometria' },
@@ -25,6 +26,7 @@ export function RenderFeedback({ renderId, offer, outputUrl, onNextImage }: {
   const [feedback, setFeedback] = useState<RenderFeedbackInput | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
+  const exposure = useResultExposure<HTMLParagraphElement>(renderId, 'feedback', available && loadedRenderId === renderId, 'render', Boolean(offer))
 
   useEffect(() => {
     let alive = true
@@ -44,6 +46,7 @@ export function RenderFeedback({ renderId, offer, outputUrl, onNextImage }: {
   }, [renderId])
 
   async function submit(useful: boolean, reason: RenderFeedbackReason | null = null) {
+    if (pending) return
     setPending(true)
     setError('')
     try {
@@ -66,7 +69,7 @@ export function RenderFeedback({ renderId, offer, outputUrl, onNextImage }: {
 
   return (
     <section className="spn-glass" aria-label="Avaliar render" style={{ padding: 16, borderRadius: 'var(--r-inner)', marginTop: 14 }}>
-      <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 560, color: 'var(--color-text-primary)' }}>
+      <p ref={exposure} style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 560, color: 'var(--color-text-primary)' }}>
         Este render serviu para o seu projeto?
       </p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

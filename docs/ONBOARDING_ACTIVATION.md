@@ -32,7 +32,7 @@ A conclusão técnica mantém comparação, download e ações sobre a imagem. A
 
 - **Sem resposta:** utilidade desconhecida; o convite contextual de assinatura não aparece.
 - **Ainda não:** mostra orientação por motivo. Materiais, luz e outros ajustes podem abrir a mesma imagem no Editar. Geometria pede revisão da referência e comparação antes de outra geração.
-- **Sim, salvo:** abre os próximos passos. Desde 15/10, o convite do Essence depende também da escolha opcional de uso em projetos todo mês. Uso pontual, necessidade desconhecida ou pergunta não respondida não exibem esse convite. Pagantes e membros de workspace compartilhado continuam inelegíveis.
+- **Sim, salvo:** abre os próximos passos. A alteração de 25/10 prepara um convite mensal ao Essence sem exigir a resposta de frequência. Uso explicitamente pontual dispensa o convite. Pagantes e membros de workspace compartilhado continuam inelegíveis. A política anterior de 15/10 exigia a escolha de uso mensal; os dados dessas versões devem ficar separados.
 - **Falha ao salvar:** mostra erro e preserva a última resposta salva; não trata uma resposta não confirmada como utilidade.
 
 A oferta lê preço e Nodes de `lib/plans.ts`. A estimativa de imagens usa o custo da configuração atual, com a indicação de que motor e resolução alteram consumo. O botão encaminha a `/app/billing?plan=essence&billing=monthly`; não inicia checkout nem pagamento automaticamente. Fechar a oferta continua possível. Os controles de saldo insuficiente continuam disponíveis quando uma operação exige mais Nodes do que o saldo.
@@ -47,7 +47,7 @@ Uma imagem recém-selecionada, um render aberto pelo histórico, `?source=` e um
 
 Após uma geração bem-sucedida, o rascunho daquela tentativa é removido. Escritas e remoções são ordenadas, e a remoção exige o ID esperado para preservar outro rascunho mais novo. Um erro de geração conserva o rascunho. O descarte manual fica disponível antes de retomar.
 
-Após utilidade positiva salva, o usuário pode ajustar a mesma imagem ou preparar outra. Preparar outra apenas abre o seletor; cancelar mantém o resultado. A pergunta opcional de continuidade tem três respostas: só neste projeto, em projetos todo mês, ainda não sei. Somente a necessidade mensal habilita a oferta contextual para uma conta já elegível. Essa preferência fica localmente por render e gera um evento de intenção; não substitui feedback de utilidade, checkout ou pagamento.
+Após utilidade positiva salva, o usuário pode ajustar a mesma imagem ou preparar outra. Preparar outra apenas abre o seletor; cancelar mantém o resultado. A pergunta opcional de continuidade tem três respostas: só neste projeto, em projetos todo mês, ainda não sei. Na alteração de 25/10, a pergunta personaliza o convite, sem ser um requisito; a resposta só neste projeto o oculta, inclusive ao recarregar. Essa preferência fica localmente por render e gera um evento de intenção; não substitui feedback de utilidade, checkout ou pagamento.
 
 ### Medição da nova versão
 
@@ -89,6 +89,18 @@ A introdução e os vídeos usam o evento existente `cta_clicked`, com valores d
 | Assinatura paga | Primeira fatura positiva vinculada à assinatura, conciliada pelo fluxo existente | Conversão paga; clique, checkout aberto e compra avulsa são diferentes. |
 
 Experimento prioritário: comparar a proporção de novas contas externas com resultado útil confirmado em sete dias, antes e depois da atualização, declarando maturação, origem e limitações. Acompanhar também resposta à pergunta de utilidade, tempo até resultado, assinatura paga e retorno. Sem grupo comparável ou volume suficiente, relatar resultado observado e pesquisa qualitativa, sem atribuir causalidade.
+
+## Convite após resultado útil — alteração de 25/10/2026
+
+O cartão do Essence aparece após feedback positivo salvo, para conta gratuita que paga a própria conta, sem exigir uma segunda resposta. A copy explica que o plano é para uso em projetos todos os meses. O preço mensal e os Nodes vêm de `lib/plans.ts`; acúmulo usa a regra central do app. Não há desconto, prazo promocional ou alteração de preço nesta mudança.
+
+A chamada principal fica logo após preço/Nodes. A estimativa usa o custo da configuração atual e é identificada como estimativa; no resultado de um ajuste, mostra ajustes, não quantidade de imagens novas. Custo inválido ou superior ao saldo do plano não produz estimativa. A saída Continuar sem assinar preserva acesso ao projeto e a dispensa na sessão daquele render. Downloads e ajuda continuam independentes do convite.
+
+O link leva a `/app/billing?from=render_result&plan=essence&billing=monthly#plan-essence`. A página destaca Essence para uma conta elegível e mostra a confirmação mensal antes do botão de assinatura. Essa origem nunca retoma checkout automaticamente, mesmo se `resume=1` for acrescentado à URL. A retomada explícita de quem veio da landing permanece separada. Nenhuma assinatura ou cobrança é criada por carregar resultado, feedback ou página de planos.
+
+Telemetria da versão `2026-10-25`: a pergunta de utilidade emite `cta_clicked/cta=render_feedback_prompt_viewed` quando pelo menos metade do texto está no viewport e o documento está visível. O cartão segue o mesmo critério para `plans_viewed/surface=render_result`. Ambos incluem apenas render_id, tipo render/edit, elegibilidade do convite e versão. A dispensa e o clique de continuação têm eventos próprios. Sem IntersectionObserver, a interface continua disponível mas não inventa exposição.
+
+Contar contas/renders distintos e separar as políticas de 15/10 e 25/10; montagens/reaberturas podem emitir exposições adicionais. Conservar utilidade positiva, negativa e desconhecida, e distinguir taxa de resposta de taxa de valor. O feedback autenticado existente continua sendo a evidência de utilidade, com as limitações de edição do histórico. Entrada na cobrança e checkout aberto não confirmam pagamento: conciliar a primeira fatura positiva de assinatura antes de relatar conversão paga. Esta alteração não resolve, por si só, acesso à conciliação financeira ou demais lacunas do Nodi.
 
 ## Verificação desta implementação
 
