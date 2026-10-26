@@ -10,6 +10,7 @@
 // Exceção única: a Limpeza (IA) usa a infra de /api/edits, com custo mostrado
 // ANTES da execução. A imagem original nunca é sobrescrita.
 
+import { prepareEditAttempt, retainEditAttempt, type EditAttempt } from '@/lib/edit-v4/client-request'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -72,6 +73,7 @@ interface Props {
   reviewBeforeEdit?: boolean
   editorTitle?: string
   /** Preço de uma edição por IA, derivado em lib/edit-v4/pricing. */
+  economicEditing?: boolean
   nodesPerEdit?: number
   /** A edição por IA está ligada neste ambiente (EDIT_V4_ENABLED no servidor)?
    *  FAIL-SAFE em false: sem isto, o mesmo componente serve o /app/finalizar de
@@ -143,7 +145,7 @@ function toStableStorageUrl(url: string): string {
 
 export function FinalizeEditor({
   initialProject, initialSourceUrl, savedProjects = [],
-  initialBalance = null, nodesPerEdit = 18, aiEnabled = false,
+  initialBalance = null, nodesPerEdit = 18, aiEnabled = false, economicEditing = false,
   recovery = null, showPlanOffer = false, initialInstruction = '', reviewBeforeEdit = false, editorTitle = 'Finalizar',
 }: Props) {
   const router = useRouter()
@@ -257,6 +259,7 @@ export function FinalizeEditor({
   const [activeRecovery, setActiveRecovery] = useState(recovery)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [recoveryResult, setRecoveryResult] = useState<{ jobId: string | null; url: string; nodes: number } | null>(null)
+  const editAttemptRef = useRef<EditAttempt | null>(null)
   const editSubmitting = useRef(false)
   const [editReferenceUrl, setEditReferenceUrl] = useState<string | null>(null)
   const [editReferenceBusy, setEditReferenceBusy] = useState(false)
@@ -868,7 +871,7 @@ export function FinalizeEditor({
 
   const runEdit = useCallback(async () => {
     const cur = docRef.current
-    if (!cur || editBusy || editSubmitting.current || !aiEnabled || ((activeRecovery || reviewBeforeEdit) && editReferenceBusy)) return
+    if (!cur || editBusy || editSubmitting.current || !aiEnabled || ((activeRecovery || reviewBeforeEdit || economicEditing) && editReferenceBusy)) return
     if (editInstruction.length > 2000) {
       setEditMsg({ kind: 'error', text: 'Resuma o pedido em até 2.000 caracteres antes de editar. O texto completo continua visível para revisão.' })
       return
@@ -895,7 +898,7 @@ export function FinalizeEditor({
     // dele, desiste e vale o que foi marcado. Melhor não uniformizar do que
     // refazer meia cena que ninguém pediu.
     let uniformizou: { coverage: number; applied: boolean } | null = null
-    if (def.uniformizes && editUniform && hasSelection) {
+    if (def.uniformizes && editUniform && hasSelection && !economicEditing) {
       uniformizou = viewportRef.current?.growEditSelection({ maxCoverage: AUTO_UNIFORM_MAX_COVERAGE }) ?? null
     }
     try {
@@ -905,6 +908,7 @@ export function FinalizeEditor({
       //    raster da varinha já nasce em espaço de origem (por isso ela se
       //    desliga quando há geometria aplicada — ver wandAvailable no viewport).
       let maskUrl: string | undefined
+      let maskIdentity = 'none'
       if (hasSelection) {
         const aspect = cur.width / Math.max(1, cur.height)
         const mapped = isGeometryIdentity(cur.geometry)
@@ -917,6 +921,7 @@ export function FinalizeEditor({
         const maskCanvas = selectionMaskPngCanvas(wandCanvas, mapped, cur.width, cur.height)
         const maskBlob = await new Promise<Blob | null>((r) => maskCanvas.toBlob(r, 'image/png'))
         if (!maskBlob) throw new Error('Falha ao gerar a seleção neste navegador. Tente novamente.')
+        maskIdentity = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await maskBlob.arrayBuffer())), v => v.toString(16).padStart(2, '0')).join('')
         // Upload DIRETO browser→Storage: rotas da Vercel rejeitam corpo >4,5 MB.
         try {
           const up = await uploadDirect(maskBlob, 'retocar-asset', { kind: 'mask' })
@@ -944,21 +949,21 @@ export function FinalizeEditor({
       }
 
       // 3. execução — o servidor só debita no sucesso
+      const payload = {
+        action: editAction, selection_confirmed: hasSelection,
+        source_image_url: sourceUrl, ...(maskUrl ? { mask_url: maskUrl } : {}),
+        instruction: editInstruction.trim(), preservation: editPreservation,
+        intensity: editIntensity, edge_softness: editEdge ?? DEFAULT_EDGE_SOFTNESS[editAction],
+        references: def.ref && editReferenceUrl ? [{ kind: def.ref, url: editReferenceUrl }] : [],
+      }
+      const identity = JSON.stringify({ ...payload, source_image_url: cur.baseUrl, mask_url: maskIdentity })
+      const attempt = prepareEditAttempt(editAttemptRef.current, identity, payload)
+      editAttemptRef.current = attempt
       const res = await fetch('/api/edit-v4', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: editAction,
-          source_image_url: sourceUrl,
-          ...(maskUrl ? { mask_url: maskUrl } : {}),
-          instruction: editInstruction.trim(),
-          preservation: editPreservation,
-          intensity: editIntensity,
-          edge_softness: editEdge ?? DEFAULT_EDGE_SOFTNESS[editAction],
-          references: def.ref && editReferenceUrl ? [{ kind: def.ref, url: editReferenceUrl }] : [],
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(attempt.body),
       })
       const j = await res.json().catch(() => null)
+      if (!retainEditAttempt(res.status, j)) editAttemptRef.current = null
 
       if (j?.rejected === true) {
         setEditMsg({ kind: 'error', text: `${j.reasons?.[0] ?? 'A edição foi descartada.'} Nenhum node foi consumido.` })
@@ -998,7 +1003,7 @@ export function FinalizeEditor({
   }, [
     editAction, editBusy, editEdge, editInstruction, editIntensity, editPreservation,
     editReferenceUrl, editStrokes, editUniform, editWand, hasEditRegions, patch,
-    activeRecovery, aiEnabled, nodesPerEdit, editReferenceBusy, reviewBeforeEdit,
+    activeRecovery, aiEnabled, nodesPerEdit, editReferenceBusy, reviewBeforeEdit, economicEditing,
   ])
 
   /** Envia a imagem de referência (material ou objeto) da ação atual. */
@@ -1638,8 +1643,8 @@ export function FinalizeEditor({
                   onEdge={setEditEdge}
                   nodes={nodesPerEdit}
                   balance={balance}
-                  busy={editBusy || ((!!activeRecovery || reviewBeforeEdit) && editReferenceBusy)}
-                  onExecute={() => { if (activeRecovery || reviewBeforeEdit) setReviewOpen(true); else void runEdit() }}
+                  busy={editBusy || ((!!activeRecovery || reviewBeforeEdit || economicEditing) && editReferenceBusy)}
+                  onExecute={() => { if (activeRecovery || reviewBeforeEdit || economicEditing) setReviewOpen(true); else void runEdit() }}
                   message={editMsg?.text ?? null}
                   messageKind={editMsg?.kind ?? null}
                 />

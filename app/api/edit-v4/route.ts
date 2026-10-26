@@ -38,6 +38,9 @@ import {
   editV4SemanticGateEnabled,
 } from '@/lib/edit-v4/flags'
 import { marginAt, nodesForEdit } from '@/lib/edit-v4/pricing'
+import { economicEnabled, economicHalfPriceFits, economicPaidCallsEnabled, ECONOMIC_NODES } from '@/lib/edit-v4/economic/policy'
+import { handleEconomicEdit } from '@/lib/edit-v4/economic/handler'
+import { runEconomicEdit } from '@/lib/edit-v4/economic/runner'
 import { EditV4GenerationError, INTENT_FOR_ACTION, runEditV4 } from '@/lib/edit-v4/pipeline'
 import { EditV4EngineError } from '@/lib/edit-v4/engine'
 import {
@@ -77,6 +80,8 @@ interface Body {
    *  em andamento → 409 e o cliente espera. Depende da coluna
    *  edit_v3_jobs.client_request_id (migration 20260917); sem ela, ignorado. */
   client_request_id?: unknown
+  selection_confirmed?: unknown
+  motor?: unknown
 }
 
 /** Aceita no máximo UMA referência, e só se o papel bater com a ação. */
@@ -163,16 +168,30 @@ export async function POST(req: NextRequest) {
 
   const chargeOn = editV4ChargeEnabled()
   const primaryRoute = editV4Route()
-  const nodes = nodesForEdit({ provider: primaryRoute })
+  const economic = economicEnabled(userId)
+  const nodes = economic ? ECONOMIC_NODES : nodesForEdit({ provider: primaryRoute })
 
   // ── Dry-run: custo, zero chamada paga, zero telemetria ────────────────────
   if (dryRun) {
     return NextResponse.json({
       dry_run: true,
-      valid: true,
+      valid: !economic || economicHalfPriceFits(),
+      execution_available: economic ? economicPaidCallsEnabled() && economicHalfPriceFits() : true,
       nodes_cost: nodes,
       charge: { simulated: !chargeOn, debited: false },
       ...(debug ? { debug: { route: primaryRoute } } : {}),
+    })
+  }
+
+  if (economic) {
+    if (!economicHalfPriceFits()) return NextResponse.json({ error: 'O preço deste motor precisa ser revisado antes de editar.', charge: { debited: false } }, { status: 503 })
+    if (body.motor !== undefined && body.motor !== 'economic') {
+      return NextResponse.json({ error: 'O motor avançado precisa de uma escolha e preço próprios.', charge: { debited: false } }, { status: 400 })
+    }
+    return handleEconomicEdit({ userId, clientRequestId, selectionConfirmed: body.selection_confirmed === true, charge: chargeOn,
+      request: { action, sourceImageUrl: sourceUrl, maskUrl, instruction, preservation: 'maximum', intensity, edgeSoftness: 'hard', references } }, {
+      admin: createAdminClient, run: input => runEconomicEdit({ ...input, observe: observeApiCall }),
+      upload: (db, ownerId, buffer) => uploadEditAsset(db, ownerId, buffer, 'result'),
     })
   }
 
@@ -357,10 +376,6 @@ export async function POST(req: NextRequest) {
       `dur=${run.cost.durationMs}ms`,
     )
 
-    // Com seleção o gate semântico é advisory: reprovou vira AVISO, não bloqueio
-    // (o recompose já garantiu os pixels de fora; o aviso cobre o de dentro).
-    const semanticWarning = run.semantic && !run.semantic.pass && !run.semantic.skipped
-
     after(() => trackSecondTool(db, req, userId, 'editar'))
 
     return NextResponse.json({
@@ -373,12 +388,6 @@ export async function POST(req: NextRequest) {
       job_id: jobId,
       charge: { simulated: !chargeOn, debited: charged },
       output: run.outputDims,
-      ...(semanticWarning
-        ? {
-            warning:
-              'A verificação visual apontou possíveis diferenças além do pedido. Confira o resultado antes de usar.',
-          }
-        : {}),
       ...(debug
         ? {
             debug: {

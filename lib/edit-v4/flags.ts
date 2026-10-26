@@ -56,9 +56,7 @@ export function editV4NormalizerEnabled(): boolean {
   return process.env.EDIT_V4_NORMALIZER !== '0'
 }
 
-/** Gate semântico pós-geração (visão compara original × resultado). Advisory
- *  quando há máscara (o recompose já garante os pixels), decisivo sem máscara.
- *  Mesma dependência do Gemini acima: indisponível → `skipped`, nunca bloqueia. */
+/** Verificação obrigatória. Desligada/indisponível impede entrega e cobrança. */
 export function editV4SemanticGateEnabled(): boolean {
   return process.env.EDIT_V4_SEMANTIC_GATE !== '0'
 }

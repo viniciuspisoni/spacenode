@@ -15,9 +15,9 @@ const FinalizeEditor = dynamic(() => import('@/components/finalizar/FinalizeEdit
 const EditV3Flow = dynamic(() => import('@/components/edit-v3/EditV3Flow').then(m => m.EditV3Flow))
 
 /** Upload the account-bound original once per mount, including React's effect replay. Never submit an edit. */
-export default function EditHandoff({ ownerId, handoffId, editor, initialBalance, nodesPerEdit, aiEnabled, savedProjects = [], showPlanOffer }: {
+export default function EditHandoff({ ownerId, handoffId, editor, initialBalance, nodesPerEdit, aiEnabled, savedProjects = [], showPlanOffer, economicEditing = false }: {
   ownerId: string; handoffId: string; editor: 'v4' | 'v3'; initialBalance: number
-  nodesPerEdit: number; aiEnabled: boolean; savedProjects?: FinalizeProjectSummary[]; showPlanOffer: boolean
+  nodesPerEdit: number; aiEnabled: boolean; savedProjects?: FinalizeProjectSummary[]; showPlanOffer: boolean; economicEditing?: boolean
 }) {
   const router = useRouter()
   const [ready, setReady] = useState<Ready | null>(null)
@@ -63,7 +63,7 @@ export default function EditHandoff({ ownerId, handoffId, editor, initialBalance
     <div className={styles.editor}>
       {editor === 'v4' ? <FinalizeEditor initialSourceUrl={ready.url} initialInstruction={ready.intention}
         reviewBeforeEdit editorTitle="Editar" savedProjects={savedProjects} initialBalance={initialBalance}
-        nodesPerEdit={nodesPerEdit} aiEnabled={aiEnabled} showPlanOffer={showPlanOffer} />
+        economicEditing={economicEditing} nodesPerEdit={nodesPerEdit} aiEnabled={aiEnabled} showPlanOffer={showPlanOffer} />
         : <EditV3Flow initialSourceUrl={ready.url} initialInstruction={ready.intention} reviewBeforeEdit initialBalance={initialBalance} showPlanOffer={showPlanOffer} />}
     </div>
   </div>

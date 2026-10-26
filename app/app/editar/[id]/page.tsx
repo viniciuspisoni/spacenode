@@ -17,6 +17,7 @@ import { notFound, redirect } from 'next/navigation'
 import { FinalizeEditor } from '@/components/finalizar/FinalizeEditor'
 import { mediaProxyUrl, mediaProxyDeep, signRows } from '@/lib/storage/signed'
 import { nodesForEdit } from '@/lib/edit-v4/pricing'
+import { economicEnabled, ECONOMIC_NODES } from '@/lib/edit-v4/economic/policy'
 import { editV4Enabled, editV4Route } from '@/lib/edit-v4/flags'
 import type { FinalizeProject, FinalizeProjectSummary } from '@/lib/finalizar/types'
 
@@ -31,6 +32,7 @@ export default async function EditarProjetoPage({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+  const economicEditing = economicEnabled(user.id)
 
   const { data, error } = await supabase
     .from('finalize_projects')
@@ -73,7 +75,7 @@ export default async function EditarProjetoPage({
         initialProject={project}
         savedProjects={savedProjects}
         initialBalance={payerBalance.totalBalance}
-        nodesPerEdit={nodesForEdit({ provider: editV4Route() })}
+        economicEditing={economicEditing} nodesPerEdit={economicEditing ? ECONOMIC_NODES : nodesForEdit({ provider: editV4Route() })}
         aiEnabled={editV4Enabled()}
       />
     </div>
