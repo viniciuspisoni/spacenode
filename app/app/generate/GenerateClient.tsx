@@ -4,6 +4,7 @@ import RenderComparisonImages from '@/components/generate/RenderComparisonImages
 import type { SavedRenderReview } from '@/lib/ai/fidelity/saved-render-review'
 import { FIXTURE_LIGHT_LABELS, resolveFixtureLights, type FixtureLights } from '@/lib/ai/fixture-lights'
 import RenderPreservationStatus from '@/components/generate/RenderPreservationStatus'
+import RenderQualityReview from '@/components/generate/RenderQualityReview'
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -1426,12 +1427,18 @@ export function GenerateClient({ userId, initialCredits, initialMaterials, initi
                   </button>
                 </div>
               ) : fidelityScore !== null && fidelityScore >= 0.8 ? (
-                <div style={S.fidelityOk}>✓ Estrutura verificada contra o projeto original</div>
+                <div style={S.fidelityOk}>Contornos comparados com o original. Confira também materiais, cores e objetos.</div>
               ) : null}
 
               {lastRenderId && <RenderFeedback key={`feedback-${lastRenderId}`} renderId={lastRenderId}
                 outputUrl={outputUrl ?? undefined} offer={showPlanOffer ? { nodeCost } : undefined}
                 onNextImage={() => { setGuideOpen(true); fileInputRef.current?.click() }} />}
+
+              <RenderQualityReview key={`quality-${lastRenderId ?? outputUrl}`} editHref={editSource} finishHref={finalSource}
+                warning={fidelityWarning} onCompare={() => {
+                  setScale(1); setPan({ x: 0, y: 0 }); setSliderPos(50)
+                  compareOuterRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+                }} />
 
               {/* Âncora: pílula de ESTADO (role=switch), não um campo de config. */}
               <div className="spn-pills">
