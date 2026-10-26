@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ANNUAL_BILLING_ENABLED, ANNUAL_DISCOUNT_PERCENT, SELLABLE_PLANS, getPlanById, type PaidPlanId, type PlanId, type BillingCycle } from '@/lib/plans'
 import { clearIntentCookie } from '@/lib/analytics/attribution'
 import { track } from '@/lib/analytics/client'
+import { POST_RESULT_VERSION } from '@/lib/onboarding/post-result'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { supportWhatsAppUrl } from '@/lib/support'
 import { EXTRA_NODE_PACKS, type ExtraPackSize } from '@/lib/extra-nodes'
@@ -74,6 +75,8 @@ interface BillingClientProps {
   canceled?: boolean
   /** Abre o checkout deste plano sozinho, uma vez, ao montar. */
   resume?: ResumeCheckout | null
+  /** A visible selection from a useful result; does not initiate checkout. */
+  postResultPlan?: 'essence' | null
 }
 
 type CheckoutPayload =
@@ -106,9 +109,10 @@ function daysUntil(date: string): number {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
 }
 
-export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, offerEligible, notice, canceled, resume, currentContract }: BillingClientProps) {
+export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, offerEligible, notice, canceled, resume, postResultPlan, currentContract }: BillingClientProps) {
   const router = useRouter()
-  useEffect(() => { track('plans_viewed', { surface: 'app_billing' }) }, [])
+  const highlightedPlan = plan === 'free' && !pooled ? postResultPlan : null
+  useEffect(() => { track('plans_viewed', { surface: 'app_billing', ...(highlightedPlan ? { plan: highlightedPlan, from: 'render_result', flow_version: POST_RESULT_VERSION } : {}) }) }, [highlightedPlan])
   // Extras para qualquer plano pago (Starter incluso desde 2026-08-31).
   const isExtraBlocked = plan === 'free'
   // Assinante de um plano aposentado (Office desde 2026-08-31, Starter desde
@@ -312,6 +316,13 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
         {/* ── 2. Plano ───────────────────────────────────────────────────── */}
         <Section>
           <SectionLabel>plano</SectionLabel>
+          {highlightedPlan && <div className="spn-glass" style={{ padding: '16px 18px', borderRadius: 'var(--r-card)', marginBottom: 18 }}>
+            <strong style={{ fontSize: 16, fontWeight: 560 }}>Continue nos próximos projetos.</strong>
+            <p style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--color-text-secondary)', margin: '8px 0 0' }}>
+              O Essence está destacado abaixo para criar todo mês. Confira o valor mensal e compare os planos.
+              O pagamento só abre quando você clicar em assinar; você confirma a compra no checkout.
+            </p>
+          </div>}
           <div style={{ display: 'flex', gap: 12, marginBottom: 18, alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Mensal/anual reconfigura todo preço abaixo: é o eixo da tela e
                 fica na superfície, como segmentado. */}
@@ -386,15 +397,17 @@ export function BillingClient({ plan, balance, nodesExpireAt, extras, pooled, of
               const current = p.id === plan
               const price = billing === 'annual' ? p.annualMonthlyPrice : p.monthlyPrice
               return (
-                <div key={p.id} className="spn-glass" style={{
+                <div key={p.id} id={`plan-${p.id}`} className="spn-glass" style={{
                   borderRadius: 'var(--r-card)', padding: '20px 18px',
                   // Verde marca o plano ATUAL — estado, nunca ação.
-                  borderColor: current ? 'var(--color-accent)' : undefined,
+                  borderColor: current ? 'var(--color-accent)' : highlightedPlan === p.id ? 'var(--color-text-primary)' : undefined,
+                  scrollMarginTop: 24,
                   display: 'flex', flexDirection: 'column',
                 }}>
                   <div className="spn-field-label">
                     {p.name}{current && <span style={{ color: 'var(--color-accent)', marginLeft: 6 }}>· atual</span>}
                   </div>
+                  {highlightedPlan === p.id && <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: '0 0 10px' }}>Escolhido no seu resultado</p>}
                   <div style={{ fontSize: 28, fontWeight: 500, color: 'var(--color-text-primary)', letterSpacing: '-0.04em', marginBottom: 2, fontVariantNumeric: 'tabular-nums' }}>
                     {p.nodes.toLocaleString('pt-BR')}
                     <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginLeft: 4, fontWeight: 400 }}>nodes/mês</span>

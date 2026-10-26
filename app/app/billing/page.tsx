@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 import { ANNUAL_BILLING_ENABLED, isSellablePlanId, findPlanByStripePriceId, getStripePriceId, type BillingCycle } from '@/lib/plans'
 import { BillingClient, type ExtraPackRow, type CheckoutNotice, type ResumeCheckout, type CurrentContract } from './BillingClient'
+import { isPostResultBillingEntry, postResultBillingPlan } from '@/lib/onboarding/post-result'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,7 @@ type Props = {
     plan?: string
     billing?: string
     resume?: string
+    from?: string
   }>
 }
 
@@ -27,10 +29,11 @@ type Props = {
  * o pior caso de um parâmetro forjado é a pessoa ver a tela de planos.
  */
 function resumeFrom(
-  sp: { plan?: string; billing?: string; resume?: string },
+  sp: { plan?: string; billing?: string; resume?: string; from?: string },
   planId: string,
   pooled: boolean,
 ): ResumeCheckout | null {
+  if (isPostResultBillingEntry(sp)) return null
   if (sp.resume !== '1' || !isSellablePlanId(sp.plan)) return null
   if (planId !== 'free' || pooled) return null
   const billing: BillingCycle = sp.billing === 'annual' && ANNUAL_BILLING_ENABLED ? 'annual' : 'monthly'
@@ -145,6 +148,7 @@ export default async function BillingPage({ searchParams }: Props) {
       currentContract={currentContract}
       canceled={sp.canceled === 'true' && balance.planId === 'free' && !balance.pooled}
       resume={resume}
+      postResultPlan={postResultBillingPlan(sp, balance.planId === 'free' && !balance.pooled)}
       plan={balance.planId}
       balance={{
         plan:  balance.planBalance,

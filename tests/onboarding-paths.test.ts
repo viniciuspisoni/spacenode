@@ -21,9 +21,10 @@ describe('onboarding até primeiro valor', () => {
   it('não oferece nova assinatura a um pagante ou membro de equipe', () => {
     expect(canOfferAfterValue(false, true)).toBe(false)
   })
-  it('oferece plano recorrente somente após utilidade e necessidade de continuar', () => {
+  it('convida após utilidade sem exigir uma segunda resposta e respeita uso pontual', () => {
     expect(canOfferForContinuation(true, true, 'recurring')).toBe(true)
-    for (const need of [null, 'unknown', 'one_project'] as const) expect(canOfferForContinuation(true, true, need)).toBe(false)
+    for (const need of [null, 'unknown'] as const) expect(canOfferForContinuation(true, true, need)).toBe(true)
+    expect(canOfferForContinuation(true, true, 'one_project')).toBe(false)
     expect(canOfferForContinuation(false, true, 'recurring')).toBe(false)
     expect(canOfferForContinuation(true, null, 'recurring')).toBe(false)
     expect(canOfferForContinuation(true, false, 'recurring')).toBe(false)

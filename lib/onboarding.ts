@@ -52,5 +52,7 @@ export function canOfferAfterValue(eligible: boolean, useful: boolean | null): b
 }
 
 export function canOfferForContinuation(eligible: boolean, useful: boolean | null, need: ContinuationNeed | null): boolean {
-  return canOfferAfterValue(eligible, useful) && need === 'recurring'
+  // The monthly invitation follows saved value; the optional frequency
+  // question personalizes it instead of being a second conversion gate.
+  return canOfferAfterValue(eligible, useful) && need !== 'one_project'
 }

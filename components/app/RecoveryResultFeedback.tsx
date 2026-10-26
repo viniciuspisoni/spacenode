@@ -6,6 +6,7 @@ import type { RenderFeedbackInput, RenderFeedbackReason } from '@/lib/render-fee
 import { recoveryHref, type RenderRecovery } from '@/lib/onboarding/render-recovery'
 import ResultNextSteps from './ResultNextSteps'
 import styles from './RenderRecovery.module.css'
+import { useResultExposure } from './useResultExposure'
 
 const REASONS: { id: RenderFeedbackReason; label: string }[] = [{ id: 'lighting', label: 'Luz' }, { id: 'materials', label: 'Materiais' }, { id: 'geometry', label: 'Geometria' }, { id: 'other', label: 'Outro motivo' }]
 export default function RecoveryResultFeedback({ recovery, jobId, outputUrl, nodes, showPlanOffer = false, onAdjust }: {
@@ -17,6 +18,7 @@ export default function RecoveryResultFeedback({ recovery, jobId, outputUrl, nod
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState('')
   const url = jobId ? `/api/renders/${encodeURIComponent(recovery.renderId)}/recovery/${encodeURIComponent(jobId)}/feedback` : null
+  const exposure = useResultExposure(recovery.renderId, 'feedback', Boolean(url) && loaded, 'edit', showPlanOffer)
   useEffect(() => {
     if (!url) return
     const abort = new AbortController()
@@ -41,7 +43,7 @@ export default function RecoveryResultFeedback({ recovery, jobId, outputUrl, nod
   return <section tabIndex={-1} className={`spn-glass ${styles.feedback}`} aria-label="Avaliar resultado do ajuste">
     <p>Compare o ajuste com a imagem anterior e confira o restante do projeto.</p>
     {url ? <>
-      <strong style={{ fontSize: 12 }}>Este render serviu para o seu projeto?</strong>
+      <strong ref={exposure} style={{ fontSize: 12 }}>Este render serviu para o seu projeto?</strong>
       <div className={styles.actions}>
         <button type="button" className="spn-pill" aria-pressed={feedback?.useful === true} disabled={pending || !loaded} onClick={() => void submit(true)}>Sim</button>
         <button type="button" className="spn-pill" aria-pressed={feedback?.useful === false} disabled={pending || !loaded} onClick={() => void submit(false)}>Ainda não</button>
