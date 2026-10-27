@@ -1,9 +1,11 @@
 import { beforeEach,afterEach,describe,it,expect,vi } from 'vitest'
 import { NextRequest } from 'next/server'
-const mocks=vi.hoisted(()=>({user:vi.fn(),handle:vi.fn(),admin:vi.fn()}))
+const mocks=vi.hoisted(()=>({user:vi.fn(),handle:vi.fn(),admin:vi.fn(),findJob:vi.fn(),insertJob:vi.fn()}))
 vi.mock('@/lib/auth/request-user',()=>({getRequestUser:mocks.user}))
 vi.mock('@/lib/supabase/admin',()=>({createAdminClient:mocks.admin}))
 vi.mock('@/lib/edit-v4/economic/handler',()=>({handleEconomicEdit:mocks.handle}))
+vi.mock('@/lib/edit-v3/persist',async original=>({...await original<typeof import('@/lib/edit-v3/persist')>(),findJobByClientRequestId:mocks.findJob,insertJobResilient:mocks.insertJob}))
+import { JobConflictError } from '@/lib/edit-v3/persist'
 import { POST } from '@/app/api/edit-v4/route'
 import { ENGINES } from '@/lib/engines'
 import { editV4ExecutionAvailable } from '@/lib/edit-v4/availability'
@@ -13,9 +15,22 @@ beforeEach(()=>{
  vi.clearAllMocks();vi.stubEnv('EDIT_V4_ENABLED','1');vi.stubEnv('EDIT_V4_PAID_CALLS','1');vi.stubEnv('EDIT_V4_ECONOMIC','1');vi.stubEnv('EDIT_V4_ECONOMIC_USERS',owner);vi.stubEnv('EDIT_V4_ECONOMIC_PAID_CALLS','0')
  vi.stubGlobal('fetch',vi.fn(()=>{throw Error('NO NETWORK')}));mocks.user.mockResolvedValue({user:{id:owner}})
  mocks.handle.mockResolvedValue(new Response(JSON.stringify({prepared:true})))
+ mocks.findJob.mockResolvedValue(null);mocks.admin.mockReturnValue({});mocks.insertJob.mockRejectedValue(new JobConflictError('already-used'))
 })
 afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals()})
 describe('actual /api/edit-v4 entry point (offline mocks)',()=>{
+ it.each(['failed','rejected'])('legacy request with %s outcome requires a fresh identity without another generation',async status=>{
+  mocks.user.mockResolvedValue({user:{id:'outside-cohort'}});vi.stubEnv('EDIT_V4_NORMALIZER','0')
+  mocks.findJob.mockResolvedValue({id:'old-job',status,charged:false,result_image_url:null,created_at:new Date().toISOString()})
+  const response=await POST(req({action:'remove',source_image_url:'https://storage/source',instruction:'Retire a bolsa.',client_request_id:owner})),body=await response.json()
+  expect(response.status).toBe(409);expect(body.terminal).toBe(true);expect(mocks.insertJob).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled()
+ })
+ it('legacy request with an uncertain debit must reconcile instead of creating another edit',async()=>{
+  mocks.user.mockResolvedValue({user:{id:'outside-cohort'}});vi.stubEnv('EDIT_V4_NORMALIZER','0')
+  mocks.findJob.mockResolvedValue({id:'old-job',status:'failed',charged:true,result_image_url:null,created_at:new Date().toISOString()})
+  const response=await POST(req({action:'remove',source_image_url:'https://storage/source',instruction:'Retire a bolsa.',client_request_id:owner})),body=await response.json()
+  expect(response.status).toBe(409);expect(body.terminal).not.toBe(true);expect(body.completion_pending).toBe(true);expect(mocks.insertJob).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled()
+ })
  it('never accepts the local smoke identity header on Vercel',async()=>{
   vi.stubEnv('VERCEL','1');mocks.user.mockResolvedValue({user:null})
   const request=req({action:'swap_material',dry_run:true});request.headers.set('x-edit-v4-test-user',owner)

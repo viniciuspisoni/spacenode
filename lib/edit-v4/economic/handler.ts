@@ -26,7 +26,8 @@ export async function handleEconomicEdit(input:{userId:string;request:EditV4Requ
   let jobId:string|null=null;let ledger:CostEntry[]=[];let db:SupabaseClient|null=null
   try{
     db=deps.admin()
-    const {data:claim,error:claimError}=await db.rpc('begin_edit_v4_economic',{user_id_input:input.userId,client_request_id_input:input.clientRequestId,request_hash_input:digest(JSON.stringify(input.request)),request_input:input.request})
+    const requestPayloadHash=digest(JSON.stringify(input.request))
+    const {data:claim,error:claimError}=await db.rpc('begin_edit_v4_economic',{user_id_input:input.userId,client_request_id_input:input.clientRequestId,request_hash_input:requestPayloadHash,request_input:input.request})
     if(claimError||!claim?.job_id)throw new EconomicEditError('claim_unavailable','Não foi possível reservar este pedido. Nenhuma edição foi iniciada.',claimError?.code==='22023'?409:503)
     if(claim.state==='completed'&&typeof claim.result_url==='string')return NextResponse.json({rejected:false,replayed:true,result_url:claim.result_url,nodes_cost:claim.nodes_cost,job_id:claim.job_id,charge:{simulated:!input.charge,debited:false}})
     if(claim.state!=='claimed')return NextResponse.json({error:claim.state==='processing'?'Este pedido ainda está em andamento. Aguarde antes de tentar novamente.':'Este pedido já foi encerrado. Confira o histórico antes de criar outra edição.',in_progress:claim.state==='processing',terminal:claim.state!=='processing',job_id:claim.job_id,charge:{debited:false}},{status:409})
@@ -37,8 +38,15 @@ export async function handleEconomicEdit(input:{userId:string;request:EditV4Requ
       if(error||!data)throw new EconomicEditError('cost_persistence_unavailable','O registro de custo está indisponível. Nenhum node foi consumido.',503)
     }})
     const url=await deps.upload(db,input.userId,result.buffer)
-    const {data:finished,error}=await db.rpc('finish_edit_v4_economic',{user_id_input:input.userId,job_id_input:jobId,status_input:'completed',result_url_input:url,ledger_input:result.ledger,
-      proof_input:{approved:true,...result.binding,candidateHash:result.candidateHash,engine:result.engine,verdict:result.verdict,metrics:result.metrics,accountedUsd:result.accountedUsd},model_input:result.model,charge_input:input.charge})
+    let completion
+    try {
+      completion=await db.rpc('finish_edit_v4_economic',{user_id_input:input.userId,job_id_input:jobId,status_input:'completed',result_url_input:url,ledger_input:result.ledger,
+        proof_input:{approved:true,requestPayloadHash,...result.binding,candidateHash:result.candidateHash,engine:result.engine,verdict:result.verdict,metrics:result.metrics,accountedUsd:result.accountedUsd},model_input:result.model,charge_input:input.charge})
+    } catch {
+      // A transport exception may follow a committed debit. Retain the UUID and reconcile.
+      return NextResponse.json({error:'Não foi possível confirmar a conclusão. Repita o mesmo pedido para consultar o resultado.',job_id:jobId,completion_pending:true,terminal:false},{status:503})
+    }
+    const {data:finished,error}=completion
     if(error||finished?.state!=='completed'){
       const rolledBack = error?.code === 'P0001' || error?.code === '22023'
       if (rolledBack) {

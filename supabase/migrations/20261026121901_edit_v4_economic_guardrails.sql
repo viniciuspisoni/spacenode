@@ -1,5 +1,11 @@
 -- Offline-reviewed preparation only. Do not apply automatically to a remote database.
 -- Existing history and workspace wallet remain authoritative. Service-role only.
+-- The September idempotency prerequisite is absent in some deployed schemas.
+-- Include it additively: never fall back to an untracked economic request.
+alter table public.edit_v3_jobs add column if not exists client_request_id text;
+create unique index if not exists edit_v3_jobs_client_request_idx
+  on public.edit_v3_jobs(user_id,client_request_id) where client_request_id is not null;
+
 create table if not exists public.edit_v4_economic_requests (
   job_id uuid primary key references public.edit_v3_jobs(id),
   user_id uuid not null,
@@ -12,7 +18,7 @@ create table if not exists public.edit_v4_economic_requests (
   unique(user_id,client_request_id)
 );
 alter table public.edit_v4_economic_requests enable row level security;
-revoke all on public.edit_v4_economic_requests from public, anon, authenticated;
+revoke all on public.edit_v4_economic_requests from public, anon, authenticated, service_role;
 grant select,insert,update on public.edit_v4_economic_requests to service_role;
 
 create or replace function public.begin_edit_v4_economic(
@@ -20,7 +26,7 @@ create or replace function public.begin_edit_v4_economic(
 ) returns jsonb language plpgsql security invoker set search_path = public, pg_temp as $$
 declare v public.edit_v4_economic_requests%rowtype; j public.edit_v3_jobs%rowtype; new_id uuid;
 begin
-  if user_id_input is null or client_request_id_input is null or request_hash_input !~ '^[a-f0-9]{64}$' then
+  if user_id_input is null or client_request_id_input is null or request_hash_input is null or request_hash_input !~ '^[a-f0-9]{64}$' then
     raise exception 'invalid edit identity' using errcode='22023';
   end if;
   perform pg_advisory_xact_lock(hashtextextended(user_id_input::text || ':' || client_request_id_input::text,0));
@@ -52,13 +58,23 @@ begin
   select * into strict j from public.edit_v3_jobs where id=job_id_input and user_id=user_id_input for update;
   if v.status='completed' then return jsonb_build_object('state','completed','job_id',j.id,'result_url',j.result_image_url,'nodes_cost',j.nodes_cost,'charged',false,'replayed',true); end if;
   if v.status <> 'processing' then raise exception 'terminal edit cannot restart' using errcode='22023'; end if;
-  if status_input not in ('completed','rejected','failed') or jsonb_typeof(ledger_input) is distinct from 'array' then raise exception 'invalid edit completion' using errcode='22023'; end if;
+  if status_input is null or status_input not in ('completed','rejected','failed') or jsonb_typeof(ledger_input) is distinct from 'array' then raise exception 'invalid edit completion' using errcode='22023'; end if;
   if status_input='completed' then
-    if proof_input->>'approved' is distinct from 'true' or nullif(result_url_input,'') is null
+    if proof_input->'approved' is distinct from 'true'::jsonb or nullif(result_url_input,'') is null
+      or proof_input->>'requestPayloadHash' is distinct from v.request_hash
       or coalesce(proof_input->>'sourceHash','') !~ '^[a-f0-9]{64}$'
       or coalesce(proof_input->>'maskHash','') !~ '^[a-f0-9]{64}$'
+      or coalesce(proof_input->>'requestHash','') !~ '^[a-f0-9]{64}$'
       or coalesce(proof_input->>'candidateHash','') !~ '^[a-f0-9]{64}$' then
       raise exception 'explicit image approval required' using errcode='22023';
+    end if;
+    if exists(select 1 from unnest(array['sourceHash','maskHash','requestHash','candidateHash']) fields(name)
+      where proof_input->>fields.name is distinct from proof_input#>>array['verdict',fields.name])
+      or proof_input#>'{metrics,outsideChangedPixels}' is distinct from '0'::jsonb then
+      raise exception 'image approval binding mismatch' using errcode='22023';
+    end if;
+    if ledger_input is distinct from v.ledger then
+      raise exception 'edit cost differs from durable ledger' using errcode='22023';
     end if;
     if jsonb_array_length(ledger_input) not in (2,3) or exists(
       select 1 from jsonb_array_elements(ledger_input) x where (x->>'status') is distinct from 'completed'
@@ -76,13 +92,14 @@ begin
           or (x->>'stage'='editor' and (x->>'knownUsd')::numeric>0.018)) then
       raise exception 'invalid edit route cost' using errcode='22023';
     end if;
-    if proof_input#>>'{verdict,requestApplied}' is distinct from 'true'
-      or proof_input#>>'{verdict,correctTarget}' is distinct from 'true'
-      or proof_input#>>'{verdict,geometryPreserved}' is distinct from 'true'
-      or proof_input#>>'{verdict,protectedPreserved}' is distinct from 'true'
-      or proof_input#>>'{verdict,artifactFree}' is distinct from 'true'
-      or proof_input#>>'{verdict,uncertain}' is distinct from 'false'
-      or (j.reference_count>0 and proof_input#>>'{verdict,referenceFollowed}' is distinct from 'true') then
+    if proof_input#>'{verdict,requestApplied}' is distinct from 'true'::jsonb
+      or proof_input#>'{verdict,correctTarget}' is distinct from 'true'::jsonb
+      or proof_input#>'{verdict,geometryPreserved}' is distinct from 'true'::jsonb
+      or proof_input#>'{verdict,protectedPreserved}' is distinct from 'true'::jsonb
+      or proof_input#>'{verdict,artifactFree}' is distinct from 'true'::jsonb
+      or proof_input#>'{verdict,uncertain}' is distinct from 'false'::jsonb
+      or (j.reference_count>0 and proof_input#>'{verdict,referenceFollowed}' is distinct from 'true'::jsonb)
+      or (j.reference_count=0 and proof_input#>'{verdict,referenceFollowed}' is distinct from 'null'::jsonb) then
       raise exception 'visual approval incomplete' using errcode='22023';
     end if;
     select sum((x->>'knownUsd')::numeric)+0.0013333333333333333+0.003459577777777778 into total_usd from jsonb_array_elements(ledger_input) x;

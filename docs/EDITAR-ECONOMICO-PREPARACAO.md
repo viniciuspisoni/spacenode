@@ -53,13 +53,13 @@ npm test -- tests/editar
 npx eslint lib/edit-v4/economic lib/edit-v4/client-request.ts lib/edit-v4/semantic-gate.ts tests/editar/economic --quiet
 ```
 
-Os testes de provedores usam HTTP simulado e bloqueiam fetch real. O banco é local em memória; nenhum advisor ou teste de RPC foi executado no projeto Supabase remoto. A migração precisa de revisão/advisors no ambiente isolado antes de aplicação remota.
+Os testes de provedores usam HTTP simulado e bloqueiam fetch real. A suíte rápida usa Postgres em memória; a validação adicional de 27/10 abaixo usa Postgres nativo isolado e as definições reais da carteira. Nenhuma migração ou RPC de cobrança foi executada em projeto remoto.
 
 Regressão opcional nas oito saídas já salvas: definir `EDIT_OFFLINE_REPLAY_ROOT` para a pasta local do projeto que contém `output/editar-flash-v4-2026-10-23`. Esse teste lê somente os arquivos congelados, confirma diferença de no máximo 1 nível sRGB e preservação exata fora da máscara; não mede precisão de IA nova.
 
 ## Antes da liberação
 
-1. Revisar PR e aplicar a migração em banco de testes isolado; executar advisors/permissões e confirmar RPCs reais da carteira/uso mensal. Não copiar segredos de produção para testes.
+1. Revisar os resultados do Postgres isolado descritos abaixo. Antes de produção, ainda conferir o transporte PostgREST e os advisors do ambiente Supabase de destino, com inferência desligada e autorização própria para qualquer aplicação remota. Não copiar segredos de produção para testes.
 2. Manter chamadas pagas e cobrança real desligadas na configuração inicial. Cotações e bloqueio de execução podem ser verificados sem credenciais de provedores.
 3. Autorizar separadamente uma nova rodada com teto global explícito. O saldo de US$15 da rodada anterior **não** é renovado ou reutilizado aqui. Os interruptores de configuração não substituem essa autorização.
 4. Validar leitores/avaliadores Luna e Flash ponta a ponta em pelo menos 24 pedidos de 12 projetos novos, com seleção e resultado de referência humanos. Medir falsa aprovação, falsa rejeição, rejeição técnica, tempo e custo completo por útil. Não tratar as duas repetições determinísticas de cor como testes independentes.
@@ -74,6 +74,21 @@ Para a branch do PR #327, configurar exclusivamente no alvo Preview: `NEXT_PUBLI
 
 Cotação autenticada: 200, 10 Nodes e `execution_available=false`. Execução autenticada: 503 antes de banco/Storage/IA, inclusive fora da lista econômica. Sem sessão: 401. Não ativar bypass de autenticação na Vercel. Para conferir seleção no navegador sem gravar dados, abrir uma imagem própria já existente em `/app/editar?source=...`, sem salvar projeto, transferir arquivos ou usar ferramentas que façam upload. Um projeto novo não faz autosave antes do primeiro salvamento manual.
 
+### Revisão e banco isolado (27/10/2026)
+
+A migração foi aplicada e reaplicada em PostgreSQL 17.10 nativo, com socket local exclusivo, sem listener TCP, sem chaves de produção e somente usuários/saldos sintéticos. As definições de sete tabelas, dos triggers relevantes e de `consume_workspace_nodes`, `consume_nodes_v2`, `expire_plan_nodes_for_user` e `bump_monthly_usage` vieram de consultas de catálogo somente de leitura. Nenhuma linha de cliente foi copiada. Login/Auth HTTP e transporte PostgREST não fazem parte desse ensaio SQL.
+
+- O schema observado não tinha `edit_v3_jobs.client_request_id`. A migração agora cria a coluna e o índice único de forma aditiva, antes das novas RPCs. Não depende de um pré-requisito que pode nunca ter sido aplicado; dados existentes não são reescritos.
+- A conclusão exige que os custos coincidam com o ledger persistido e que a prova corresponda ao pedido reservado, à imagem, à máscara e ao parecer do avaliador. Ausência de comprovação de preservação externa, hashes divergentes e booleanos serializados como texto são recusados antes do débito.
+- A tabela privada revoga também os privilégios herdados de `service_role` antes de conceder apenas SELECT/INSERT/UPDATE; permissões padrão não deixam DELETE/TRUNCATE por acidente.
+- Exceção de transporte depois de enviar a conclusão fica pendente de reconciliação com o mesmo UUID. Não marca falha terminal nem tenta gerar/cobrar novamente. A regressão reproduziu o comportamento anterior e passou após a correção.
+- A criação do índice único também passa a valer para o Pro legado. Pedidos legados encerrados e marcados como não cobrados não são reinseridos com o mesmo UUID; a resposta terminal permite que o cliente encerre aquela tentativa. Histórico com débito confirmado ou incerto exige reconciliação e não convida nova geração.
+- 28 cenários nativos passaram: carteira individual e do workspace, mensais + extras, falta de saldo, expiração, rejeição, custos/provas inválidos, rollback por falha no histórico/uso mensal, concorrência entre conexões distintas, cobrança única, permissões, RLS e reaplicação sem perda de dados.
+- 208 testes rápidos do módulo Editar passaram, com um replay opcional ignorado; TypeScript e lint dos arquivos alterados passaram.
+- Quatro regras SQL oficiais do Supabase/Splinter foram executadas no cluster isolado para os novos objetos: nenhum erro/aviso inesperado. O INFO de RLS sem política na tabela de custos é intencional: clientes não têm acesso e o servidor opera por service-role. Não criar uma política de cliente apenas para suprimir esse INFO.
+
+Os testes financeiros usam as funções reais em dados fictícios, sem provedores de IA. O cluster é encerrado e removido ao final. Essa validação não demonstra precisão dos modelos nem margem de produção. O avaliador do caminho Pro legado continua exigindo validação de disponibilidade antes de liberar o PR.
+
 ## Referências consultadas em 26/10/2026
 
 - https://developers.openai.com/api/docs/models/gpt-6-luna
@@ -84,7 +99,7 @@ Cotação autenticada: 200, 10 Nodes e `execution_available=false`. Execução a
 - https://supabase.com/docs/reference/javascript/rpc
 - https://supabase.com/changelog/postgres-15-19-17-11-breaking-changes
 
-## Evidência desta integração
+## Evidência da integração local de 26/10/2026
 
 - 193 testes do módulo Editar passaram; o replay opcional fica ignorado na execução padrão e foi executado separadamente com os arquivos locais.
 - O replay de oito saídas de quatro tarefas resultou em RGB idêntico às imagens congeladas, inclusive dentro da seleção. Isso verifica o porte da operação de cor, não precisão de IA em casos novos.

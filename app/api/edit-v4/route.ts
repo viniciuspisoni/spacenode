@@ -214,7 +214,19 @@ export async function POST(req: NextRequest) {
     // devolve 409 e o cliente espera. Sem a coluna no banco a busca cai em
     // null e o fluxo segue como sempre.
     if (clientRequestId) {
-      const decision = decideReplay(await findJobByClientRequestId(db, userId, clientRequestId))
+      const prior = await findJobByClientRequestId(db, userId, clientRequestId)
+      if (prior && (prior.status === 'failed' || prior.status === 'rejected')) {
+        // The unique index forbids reusing terminal IDs. A possibly charged job
+        // must reconcile instead of inviting a fresh generation and another debit.
+        const terminal = prior.charged === false
+        return NextResponse.json({
+          error: terminal
+            ? 'Este pedido já foi encerrado. Confira o histórico antes de iniciar uma nova edição.'
+            : 'A conclusão deste pedido precisa ser conferida. Consulte o histórico antes de editar novamente.',
+          terminal, completion_pending: !terminal, job_id: prior.id,
+        }, { status: 409 })
+      }
+      const decision = decideReplay(prior)
       if (decision.kind === 'replay') {
         console.log(`[edit-v4] replay user=${userId} job=${decision.job.id} (client_request_id repetido)`)
         return NextResponse.json({

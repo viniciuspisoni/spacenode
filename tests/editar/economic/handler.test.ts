@@ -69,4 +69,10 @@ describe('economic delivery boundary with simulated database/provider dependenci
   expect(response.status).toBe(503);expect(body.completion_pending).toBe(true);expect(body.result_url).toBeUndefined()
   expect(deps.rpc).toHaveBeenCalledTimes(2);expect(deps.run).toHaveBeenCalledTimes(1)
  })
+ it('keeps an exception after submitting completion pending with the same request identity',async()=>{
+  const deps=dependencies();deps.rpc.mockReset().mockResolvedValueOnce({data:{state:'claimed',job_id:'job1'},error:null}).mockRejectedValueOnce(new Error('Response lost after commit'))
+  const response=await handleEconomicEdit(input,deps),body=await response.json()
+  expect(response.status).toBe(503);expect(body.completion_pending).toBe(true);expect(body.terminal).not.toBe(true)
+  expect(body.result_url).toBeUndefined();expect(deps.rpc).toHaveBeenCalledTimes(2);expect(deps.run).toHaveBeenCalledTimes(1)
+ })
 })

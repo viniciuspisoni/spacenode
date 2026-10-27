@@ -4,7 +4,8 @@ import { beforeAll,beforeEach,afterAll,describe,it,expect } from 'vitest'
 const owner='00000000-0000-0000-0000-000000000001',requestId='00000000-0000-0000-0000-000000000002',hash='a'.repeat(64)
 const request={action:'swap_material',sourceImageUrl:'https://storage/owner/source.png',maskUrl:'https://storage/owner/mask.png',instruction:'paint navy',references:[]}
 const ledger=[{stage:'reader',status:'completed',knownUsd:.002},{stage:'judge',status:'completed',knownUsd:.001}]
-const proof={approved:true,sourceHash:hash,maskHash:hash,candidateHash:hash,verdict:{requestApplied:true,correctTarget:true,geometryPreserved:true,protectedPreserved:true,artifactFree:true,uncertain:false,referenceFollowed:null}}
+const binding={sourceHash:hash,maskHash:hash,requestHash:hash,candidateHash:hash}
+const proof={approved:true,...binding,requestPayloadHash:hash,metrics:{outsideChangedPixels:0},verdict:{...binding,requestApplied:true,correctTarget:true,geometryPreserved:true,protectedPreserved:true,artifactFree:true,uncertain:false,referenceFollowed:null}}
 describe('economic claim, history and atomic wallet completion (real SQL, local Postgres)',()=>{
  let db:PGlite
  beforeAll(async()=>{
@@ -18,14 +19,21 @@ describe('economic claim, history and atomic wallet completion (real SQL, local 
       if not found then raise exception 'insufficient' using errcode='P0001';end if;return '{}'::json;
     end $$;
     create function public.bump_monthly_usage(user_id_input uuid,edits_delta integer,free_fixes_delta integer,nodes_delta integer) returns void language sql as $$update usage_count set edits=edits+edits_delta$$;`)
-  for(const file of ['20260623000000_edit_v3_jobs.sql','20260910040000_edit_jobs_widen_checks.sql','20260917120000_edit_v3_jobs_client_request_id.sql'])await db.exec(readFileSync('supabase/migrations/'+file,'utf8'))
+  for(const file of ['20260623000000_edit_v3_jobs.sql','20260910040000_edit_jobs_widen_checks.sql'])await db.exec(readFileSync('supabase/migrations/'+file,'utf8'))
   const sql=readFileSync('supabase/migrations/20261026121901_edit_v4_economic_guardrails.sql','utf8');await db.exec(sql);await db.exec(sql)
  },20000)
  beforeEach(async()=>{await db.exec('truncate public.edit_v4_economic_requests,public.edit_v3_jobs;update wallet set balance=100;update usage_count set edits=0;')})
  afterAll(async()=>{await db.close()})
  async function begin(h=hash){return (await db.query<{v:{job_id:string;state:string;result_url?:string}}>('select public.begin_edit_v4_economic($1,$2,$3,$4::jsonb) v',[owner,requestId,h,JSON.stringify(request)])).rows[0].v}
- async function finish(id:string,status='completed',costs:unknown=ledger,approval:unknown=proof,charge=true){return (await db.query<{v:{state:string;charged:boolean;result_url:string|null}}>('select public.finish_edit_v4_economic($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$8) v',[owner,id,status,'https://storage/result.png',JSON.stringify(costs),JSON.stringify(approval),'local-linear-paint-v1',charge])).rows[0].v}
+ async function finish(id:string,status='completed',costs:unknown=ledger,approval:unknown=proof,charge=true,persistCosts=true){
+  if(persistCosts)await db.query("update public.edit_v4_economic_requests set ledger=$1::jsonb where job_id=$2 and status='processing'",[JSON.stringify(costs),id])
+  return (await db.query<{v:{state:string;charged:boolean;result_url:string|null}}>('select public.finish_edit_v4_economic($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7,$8) v',[owner,id,status,'https://storage/result.png',JSON.stringify(costs),JSON.stringify(approval),'local-linear-paint-v1',charge])).rows[0].v
+ }
  async function balance(){return (await db.query<{balance:number}>('select balance from wallet')).rows[0].balance}
+ it('installs the missing request-id column and unique index itself',async()=>{
+  expect((await db.query("select column_name from information_schema.columns where table_name='edit_v3_jobs' and column_name='client_request_id'")).rows).toHaveLength(1)
+  expect((await db.query("select indexname from pg_indexes where indexname='edit_v3_jobs_client_request_idx'")).rows).toHaveLength(1)
+ })
  it('claims once and returns processing on a repeat',async()=>{
   const first=await begin(),second=await begin();expect(first.state).toBe('claimed');expect(second.state).toBe('processing');expect(first.job_id).toBe(second.job_id)
   expect((await db.query('select * from edit_v3_jobs')).rows).toHaveLength(1)
@@ -49,6 +57,20 @@ describe('economic claim, history and atomic wallet completion (real SQL, local 
  })
  it.each([{}, {...proof,verdict:{...proof.verdict,geometryPreserved:false}}, {...proof,approved:false}])('rejects incomplete visual proof before debit',async approval=>{
   const {job_id}=await begin();await expect(finish(job_id,'completed',ledger,approval)).rejects.toThrow();expect(await balance()).toBe(100)
+ })
+ it.each([
+  {...proof,requestPayloadHash:'b'.repeat(64)},
+  {...proof,verdict:{...proof.verdict,candidateHash:'b'.repeat(64)}},
+  {...proof,verdict:{...proof.verdict,requestHash:'b'.repeat(64)}},
+  {...proof,metrics:{outsideChangedPixels:1}},
+  {...proof,approved:'true'},
+ ])('rejects a mismatched request, verdict or preservation proof before debit',async approval=>{
+  const {job_id}=await begin();await expect(finish(job_id,'completed',ledger,approval)).rejects.toThrow();expect(await balance()).toBe(100)
+ })
+ it('cannot replace the persisted ledger with lower costs at completion',async()=>{
+  const {job_id}=await begin();await db.query('update public.edit_v4_economic_requests set ledger=$1::jsonb where job_id=$2',[JSON.stringify(ledger),job_id])
+  await expect(finish(job_id,'completed',[{...ledger[0],knownUsd:0},ledger[1]],proof,true,false)).rejects.toThrow('edit cost differs from durable ledger')
+  expect(await balance()).toBe(100)
  })
  it.each([{costs:[{stage:'reader',status:'completed',knownUsd:.1},ledger[1]]},{costs:[{stage:'reader',status:'completed',knownUsd:null},ledger[1]]},{costs:[ledger[0]]}])('rejects over-cap, unknown or missing stage costs',async ({costs})=>{
   const {job_id}=await begin();await expect(finish(job_id,'completed',costs)).rejects.toThrow();expect(await balance()).toBe(100)
