@@ -1342,7 +1342,7 @@ export function FinalizeEditor({
                     </div>
                     <div className="spn-card-body">
                       <div className="spn-card-title">{p.name}</div>
-                      <div className="spn-card-meta">{new Date(p.updated_at).toLocaleDateString('pt-BR')}</div>
+                      <div className="spn-card-meta">{new Date(p.updated_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</div>
                     </div>
                   </button>
                 ))}
