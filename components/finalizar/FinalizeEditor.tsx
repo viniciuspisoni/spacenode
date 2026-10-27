@@ -884,10 +884,14 @@ export function FinalizeEditor({
     }
     const def = EDIT_ACTIONS.find((a2) => a2.id === editAction) ?? EDIT_ACTIONS[0]
     const hasSelection = editStrokes.length > 0 || editWand !== null || hasEditRegions
-    if (def.requiresSelection && !hasSelection) {
-      setEditMsg({ kind: 'error', text: editAction === 'insert_element'
+    if ((economicEditing || def.requiresSelection) && !hasSelection) {
+      setEditMsg({ kind: 'error', text: economicEditing ? 'Marque a área completa que deseja ajustar.' : editAction === 'insert_element'
         ? 'Marque o lugar onde o elemento entra.'
         : 'Marque o objeto que será trocado.' })
+      return
+    }
+    if (economicEditing && !editInstruction.trim()) {
+      setEditMsg({ kind: 'error', text: 'Descreva a mudança antes de confirmar a edição.' })
       return
     }
     if (!hasSelection && !editInstruction.trim() && !editReferenceUrl) {
@@ -958,8 +962,8 @@ export function FinalizeEditor({
       const payload = {
         action: editAction, selection_confirmed: hasSelection,
         source_image_url: sourceUrl, ...(maskUrl ? { mask_url: maskUrl } : {}),
-        instruction: editInstruction.trim(), preservation: editPreservation,
-        intensity: editIntensity, edge_softness: editEdge ?? DEFAULT_EDGE_SOFTNESS[editAction],
+        instruction: editInstruction.trim(), preservation: economicEditing ? 'maximum' : editPreservation,
+        intensity: editIntensity, edge_softness: economicEditing ? 'hard' : editEdge ?? DEFAULT_EDGE_SOFTNESS[editAction],
         references: def.ref && editReferenceUrl ? [{ kind: def.ref, url: editReferenceUrl }] : [],
       }
       const identity = JSON.stringify({ ...payload, source_image_url: cur.baseUrl, mask_url: maskIdentity })
@@ -1577,6 +1581,7 @@ export function FinalizeEditor({
                   outputUrl={recoveryResult.url} nodes={recoveryResult.nodes} showPlanOffer={showPlanOffer}
                   onAdjust={() => { asideRef.current?.querySelector<HTMLTextAreaElement>('textarea')?.focus() }} />}
                 <EditPanel
+                  economicEditing={economicEditing}
                   action={editAction}
                   onAction={(a2) => { setEditAction(a2); setEditEdge(null); setEditReferenceUrl(null) }}
                   instruction={editInstruction}
@@ -1641,11 +1646,11 @@ export function FinalizeEditor({
                   onPickReference={() => referenceInputRef.current?.click()}
                   onClearReference={() => setEditReferenceUrl(null)}
                   referenceBusy={editReferenceBusy}
-                  preservation={editPreservation}
+                  preservation={economicEditing ? 'maximum' : editPreservation}
                   onPreservation={setEditPreservation}
                   intensity={editIntensity}
                   onIntensity={setEditIntensity}
-                  edge={editEdge ?? DEFAULT_EDGE_SOFTNESS[editAction]}
+                  edge={economicEditing ? 'hard' : editEdge ?? DEFAULT_EDGE_SOFTNESS[editAction]}
                   onEdge={setEditEdge}
                   nodes={nodesPerEdit}
                   balance={balance}
@@ -1657,7 +1662,7 @@ export function FinalizeEditor({
                 <RecoveryEditReview open={reviewOpen} onClose={() => setReviewOpen(false)}
                   onConfirm={() => { setReviewOpen(false); void runEdit() }} instruction={editInstruction}
                   actionLabel={EDIT_ACTIONS.find(item => item.id === editAction)?.short ?? 'Editar'}
-                  settings={`${editPreservation === 'maximum' ? 'Preservação máxima' : 'Preservação padrão'} · Intensidade ${editIntensity === 'subtle' ? 'sutil' : editIntensity === 'strong' ? 'forte' : 'padrão'}`}
+                  settings={`${economicEditing || editPreservation === 'maximum' ? 'Preservação máxima' : 'Preservação padrão'}${economicEditing ? ' · Borda exata' : ''} · Intensidade ${editIntensity === 'subtle' ? 'sutil' : editIntensity === 'strong' ? 'forte' : 'padrão'}`}
                   selectionMayExpand={!economicEditing && editUniform && !!EDIT_ACTIONS.find(item => item.id === editAction)?.uniformizes}
                   hasSelection={editWand !== null || editStrokes.length > 0 || hasEditRegions}
                   referenceUrl={editReferenceUrl} nodes={nodesPerEdit} busy={editBusy} previewOnly={!aiExecutionAvailable} />
