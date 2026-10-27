@@ -6,7 +6,8 @@ Esta implementação prepara um piloto interno. Não constitui liberação de pr
 
 - O servidor habilita a rota econômica apenas com `EDIT_V4_ECONOMIC=1` **e** UUID do usuário em `EDIT_V4_ECONOMIC_USERS` (lista separada por vírgulas). A lista vem da configuração do servidor, nunca do cliente. O restante da base continua na rota existente.
 - A cotação e a tela exibem 10 Nodes para o grupo interno. `dry_run=true` não busca imagens, não cria jobs e não chama provedores. O teto aritmético é comparado com metade da geração Quasar 2K do catálogo; equivalência de qualidade/resolução ainda precisa ser validada.
-- `EDIT_V4_ECONOMIC_PAID_CALLS` nasce desligado. Mesmo que a rota econômica esteja habilitada, o POST real retorna indisponibilidade sem acessar banco, Storage ou provedores. Este PR não altera variáveis remotas.
+- `EDIT_V4_ECONOMIC_PAID_CALLS` nasce desligado. Mesmo que a rota econômica esteja habilitada, o POST real retorna indisponibilidade sem acessar banco, Storage ou provedores. A preparação de 26/10 não alterou variáveis remotas; a configuração de 27/10 é restrita à prévia descrita abaixo.
+- `EDIT_V4_PAID_CALLS=0` pausa também os motores legados, antes de criar cliente administrativo, normalizar o pedido ou iniciar edição. Ausente conserva o comportamento legado. A cotação e todos os pontos de entrada do editor recebem a mesma disponibilidade calculada no servidor; na pausa a revisão permite conferir preço e pedido, e confirma localmente antes de enviar máscara/imagem. Não altera os ajustes gratuitos nem autoriza inferência.
 - O piloto exige texto original, máscara completa confirmada, UUID do pedido e uploads do próprio usuário. Não amplia a máscara automaticamente. Imports de CDN e imagens pertencentes a outros membros precisam de um resolvedor de autorização antes de ampliar o escopo.
 - Leitura visual Luna recebe origem, máscara, detalhe correspondente, pedido original e referência opcional. Todas as decisões são vinculadas por hashes de pixels da origem, máscara e pedido. Seleção incompleta, alvo ambíguo ou sobreposição de protegidos interrompe o fluxo.
 - Trocas simples no mesmo material/acabamento podem usar as quatro cores predefinidas (azul-marinho, sálvia, oliva, floresta). A aplicação usa exclusivamente pixels originais, máscara e cor fixa. Não aceita imagem/paleta Flash. Preto metálico, novas texturas e referências vão ao Flash.
@@ -66,6 +67,12 @@ Regressão opcional nas oito saídas já salvas: definir `EDIT_OFFLINE_REPLAY_RO
 6. Manter pilar/reboco e demais casos não aprovados fora do escopo inicial. Precisão e margens de novos pedidos ainda não estão demonstradas. Liberar um grupo pequeno somente após esses critérios, com acompanhamento e reversão pronta.
 
 Rollback do piloto: retirar usuário da lista ou desligar `EDIT_V4_ECONOMIC`. Para suspender chamadas novas imediatamente, `EDIT_V4_ECONOMIC_PAID_CALLS=0`. Não apagar históricos/ledger ou reverter débitos confirmados durante rollback. Retirar o interruptor não cancela uma chamada já enviada; reconciliar os pedidos em andamento.
+
+### Prévia sem inferência (27/10/2026)
+
+Para a branch do PR #327, configurar exclusivamente no alvo Preview: `NEXT_PUBLIC_EDIT_V4=1`, `EDIT_V4_ENABLED=1`, `EDIT_V4_ECONOMIC=1`, `EDIT_V4_ECONOMIC_USERS=<UUID da conta interna>`, `EDIT_V4_ECONOMIC_PAID_CALLS=0`, `EDIT_V4_PAID_CALLS=0`, `EDIT_V4_CHARGE=0`. Nunca atribuir essas configurações de teste ao alvo Production. O próximo build da branch recebe a configuração; deployments anteriores permanecem com sua configuração congelada.
+
+Cotação autenticada: 200, 10 Nodes e `execution_available=false`. Execução autenticada: 503 antes de banco/Storage/IA, inclusive fora da lista econômica. Sem sessão: 401. Não ativar bypass de autenticação na Vercel. Para conferir seleção no navegador sem gravar dados, abrir uma imagem própria já existente em `/app/editar?source=...`, sem salvar projeto, transferir arquivos ou usar ferramentas que façam upload. Um projeto novo não faz autosave antes do primeiro salvamento manual.
 
 ## Referências consultadas em 26/10/2026
 

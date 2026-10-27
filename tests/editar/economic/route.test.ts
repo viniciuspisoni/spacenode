@@ -6,15 +6,37 @@ vi.mock('@/lib/supabase/admin',()=>({createAdminClient:mocks.admin}))
 vi.mock('@/lib/edit-v4/economic/handler',()=>({handleEconomicEdit:mocks.handle}))
 import { POST } from '@/app/api/edit-v4/route'
 import { ENGINES } from '@/lib/engines'
+import { editV4ExecutionAvailable } from '@/lib/edit-v4/availability'
 const owner='00000000-0000-0000-0000-000000000001'
 const req=(body:unknown)=>new NextRequest('http://localhost/api/edit-v4',{method:'POST',body:JSON.stringify(body),headers:{'Content-Type':'application/json'}})
 beforeEach(()=>{
- vi.clearAllMocks();vi.stubEnv('EDIT_V4_ENABLED','1');vi.stubEnv('EDIT_V4_ECONOMIC','1');vi.stubEnv('EDIT_V4_ECONOMIC_USERS',owner);vi.stubEnv('EDIT_V4_ECONOMIC_PAID_CALLS','0')
+ vi.clearAllMocks();vi.stubEnv('EDIT_V4_ENABLED','1');vi.stubEnv('EDIT_V4_PAID_CALLS','1');vi.stubEnv('EDIT_V4_ECONOMIC','1');vi.stubEnv('EDIT_V4_ECONOMIC_USERS',owner);vi.stubEnv('EDIT_V4_ECONOMIC_PAID_CALLS','0')
  vi.stubGlobal('fetch',vi.fn(()=>{throw Error('NO NETWORK')}));mocks.user.mockResolvedValue({user:{id:owner}})
  mocks.handle.mockResolvedValue(new Response(JSON.stringify({prepared:true})))
 })
 afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals()})
 describe('actual /api/edit-v4 entry point (offline mocks)',()=>{
+ it('never accepts the local smoke identity header on Vercel',async()=>{
+  vi.stubEnv('VERCEL','1');mocks.user.mockResolvedValue({user:null})
+  const request=req({action:'swap_material',dry_run:true});request.headers.set('x-edit-v4-test-user',owner)
+  expect((await POST(request)).status).toBe(401)
+  expect(mocks.handle).not.toHaveBeenCalled();expect(mocks.admin).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled()
+ })
+ it.each([owner,'outside-cohort'])('global pause stops execution before persistence or provider for %s',async id=>{
+  vi.stubEnv('EDIT_V4_PAID_CALLS','0');vi.stubEnv('EDIT_V4_ECONOMIC_PAID_CALLS','1');mocks.user.mockResolvedValue({user:{id}})
+  const body={action:'swap_material',source_image_url:'https://storage/source',mask_url:'https://storage/mask',instruction:'Pinte só o painel.',selection_confirmed:true,client_request_id:owner}
+  const quote=await (await POST(req({...body,dry_run:true}))).json()
+  expect(quote).toMatchObject({nodes_cost:id===owner?10:18,execution_available:false,charge:{debited:false}})
+  expect(editV4ExecutionAvailable(id)).toBe(false)
+  const response=await POST(req(body));expect(response.status).toBe(503);expect((await response.json()).charge.debited).toBe(false)
+  expect(mocks.admin).not.toHaveBeenCalled();expect(mocks.handle).not.toHaveBeenCalled();expect(fetch).not.toHaveBeenCalled()
+ })
+ it('the server availability used by the editor honors the economic pause independently',()=>{
+  expect(editV4ExecutionAvailable(owner)).toBe(false)
+  expect(editV4ExecutionAvailable('outside-cohort')).toBe(true)
+  vi.stubEnv('EDIT_V4_ECONOMIC_PAID_CALLS','1');expect(editV4ExecutionAvailable(owner)).toBe(true)
+  vi.stubEnv('EDIT_V4_ENABLED','0');expect(editV4ExecutionAvailable(owner)).toBe(false)
+ })
  it('quotes 10 Nodes for an allowlisted authenticated user without running anything',async()=>{
   const response=await POST(req({action:'swap_material',dry_run:true})),body=await response.json()
   expect(body).toMatchObject({valid:true,nodes_cost:10,execution_available:false,charge:{debited:false}})

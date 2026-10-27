@@ -19,6 +19,7 @@ import { mediaProxyUrl, mediaProxyDeep, signRows } from '@/lib/storage/signed'
 import { nodesForEdit } from '@/lib/edit-v4/pricing'
 import { economicEnabled, ECONOMIC_NODES } from '@/lib/edit-v4/economic/policy'
 import { editV4Enabled, editV4Route } from '@/lib/edit-v4/flags'
+import { editV4ExecutionAvailable } from '@/lib/edit-v4/availability'
 import type { FinalizeProject, FinalizeProjectSummary } from '@/lib/finalizar/types'
 
 export default async function EditarProjetoPage({
@@ -77,6 +78,7 @@ export default async function EditarProjetoPage({
         initialBalance={payerBalance.totalBalance}
         economicEditing={economicEditing} nodesPerEdit={economicEditing ? ECONOMIC_NODES : nodesForEdit({ provider: editV4Route() })}
         aiEnabled={editV4Enabled()}
+        aiExecutionAvailable={editV4ExecutionAvailable(user.id)}
       />
     </div>
   )

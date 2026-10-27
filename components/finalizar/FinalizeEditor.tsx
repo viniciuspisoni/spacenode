@@ -80,6 +80,8 @@ interface Props {
    *  produção — onde a rota responde 404 — e abriria numa aba que só sabe
    *  falhar. Com false ele é o editor de pós-produção de sempre. */
   aiEnabled?: boolean
+  /** Decisão do servidor; pausa antes de enviar máscara, imagem ou pedido. */
+  aiExecutionAvailable?: boolean
   recovery?: RenderRecovery | null
   showPlanOffer?: boolean
 }
@@ -145,7 +147,7 @@ function toStableStorageUrl(url: string): string {
 
 export function FinalizeEditor({
   initialProject, initialSourceUrl, savedProjects = [],
-  initialBalance = null, nodesPerEdit = 18, aiEnabled = false, economicEditing = false,
+  initialBalance = null, nodesPerEdit = 18, aiEnabled = false, aiExecutionAvailable = true, economicEditing = false,
   recovery = null, showPlanOffer = false, initialInstruction = '', reviewBeforeEdit = false, editorTitle = 'Finalizar',
 }: Props) {
   const router = useRouter()
@@ -872,6 +874,10 @@ export function FinalizeEditor({
   const runEdit = useCallback(async () => {
     const cur = docRef.current
     if (!cur || editBusy || editSubmitting.current || !aiEnabled || ((activeRecovery || reviewBeforeEdit || economicEditing) && editReferenceBusy)) return
+    if (!aiExecutionAvailable) {
+      setEditMsg({ kind: 'info', text: 'Pedido conferido. As edições com IA estão pausadas; nenhuma edição foi enviada e nenhum node foi consumido.' })
+      return
+    }
     if (editInstruction.length > 2000) {
       setEditMsg({ kind: 'error', text: 'Resuma o pedido em até 2.000 caracteres antes de editar. O texto completo continua visível para revisão.' })
       return
@@ -1003,7 +1009,7 @@ export function FinalizeEditor({
   }, [
     editAction, editBusy, editEdge, editInstruction, editIntensity, editPreservation,
     editReferenceUrl, editStrokes, editUniform, editWand, hasEditRegions, patch,
-    activeRecovery, aiEnabled, nodesPerEdit, editReferenceBusy, reviewBeforeEdit, economicEditing,
+    activeRecovery, aiEnabled, aiExecutionAvailable, nodesPerEdit, editReferenceBusy, reviewBeforeEdit, economicEditing,
   ])
 
   /** Envia a imagem de referência (material ou objeto) da ação atual. */
@@ -1645,16 +1651,16 @@ export function FinalizeEditor({
                   balance={balance}
                   busy={editBusy || ((!!activeRecovery || reviewBeforeEdit || economicEditing) && editReferenceBusy)}
                   onExecute={() => { if (activeRecovery || reviewBeforeEdit || economicEditing) setReviewOpen(true); else void runEdit() }}
-                  message={editMsg?.text ?? null}
+                  message={editMsg?.text ?? (!aiExecutionAvailable ? 'As edições com IA estão pausadas. Você pode conferir o pedido e o custo.' : null)}
                   messageKind={editMsg?.kind ?? null}
                 />
                 <RecoveryEditReview open={reviewOpen} onClose={() => setReviewOpen(false)}
                   onConfirm={() => { setReviewOpen(false); void runEdit() }} instruction={editInstruction}
                   actionLabel={EDIT_ACTIONS.find(item => item.id === editAction)?.short ?? 'Editar'}
                   settings={`${editPreservation === 'maximum' ? 'Preservação máxima' : 'Preservação padrão'} · Intensidade ${editIntensity === 'subtle' ? 'sutil' : editIntensity === 'strong' ? 'forte' : 'padrão'}`}
-                  selectionMayExpand={editUniform && !!EDIT_ACTIONS.find(item => item.id === editAction)?.uniformizes}
+                  selectionMayExpand={!economicEditing && editUniform && !!EDIT_ACTIONS.find(item => item.id === editAction)?.uniformizes}
                   hasSelection={editWand !== null || editStrokes.length > 0 || hasEditRegions}
-                  referenceUrl={editReferenceUrl} nodes={nodesPerEdit} busy={editBusy} />
+                  referenceUrl={editReferenceUrl} nodes={nodesPerEdit} busy={editBusy} previewOnly={!aiExecutionAvailable} />
                 </>
               )}
               {tool === 'geometry' && <GeometryPanel doc={doc} patch={patch} />}

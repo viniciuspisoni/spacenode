@@ -34,11 +34,13 @@ import {
   editV4Enabled,
   editV4NormalizerEnabled,
   editV4OutlineEnabled,
+  editV4PaidCallsEnabled,
   editV4Route,
   editV4SemanticGateEnabled,
 } from '@/lib/edit-v4/flags'
 import { marginAt, nodesForEdit } from '@/lib/edit-v4/pricing'
-import { economicEnabled, economicHalfPriceFits, economicPaidCallsEnabled, ECONOMIC_NODES } from '@/lib/edit-v4/economic/policy'
+import { economicEnabled, economicHalfPriceFits, ECONOMIC_NODES } from '@/lib/edit-v4/economic/policy'
+import { editV4ExecutionAvailable } from '@/lib/edit-v4/availability'
 import { handleEconomicEdit } from '@/lib/edit-v4/economic/handler'
 import { runEconomicEdit } from '@/lib/edit-v4/economic/runner'
 import { EditV4GenerationError, INTENT_FOR_ACTION, runEditV4 } from '@/lib/edit-v4/pipeline'
@@ -176,11 +178,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       dry_run: true,
       valid: !economic || economicHalfPriceFits(),
-      execution_available: economic ? economicPaidCallsEnabled() && economicHalfPriceFits() : true,
+      execution_available: editV4ExecutionAvailable(userId),
       nodes_cost: nodes,
       charge: { simulated: !chargeOn, debited: false },
       ...(debug ? { debug: { route: primaryRoute } } : {}),
     })
+  }
+
+  if (!editV4PaidCallsEnabled()) {
+    return NextResponse.json({ error: 'As edições com IA estão pausadas. Nenhum node foi consumido.', nodes_cost: nodes, charge: { debited: false } }, { status: 503 })
   }
 
   if (economic) {
