@@ -10,9 +10,8 @@ import { useMarketingConsent } from './useMarketingConsent'
 // Sem as duas, nada é injetado — nenhuma requisição sai para o Meta.
 //
 // O evento de cadastro NÃO sai daqui — quem dispara CompleteRegistration é
-// components/SignupConversionPing.tsx, reaproveitando o mesmo gatilho
-// `?signup=1` que já existia para a conversão do Google Ads. Um único ponto
-// de disparo por cadastro, sem CAPI.
+// components/marketing/AttributionBinder.tsx, após confirmação autenticada.
+// O eventID é o mesmo da API de Conversões para deduplicação.
 export default function MetaPixel() {
   const consent = useMarketingConsent()
 

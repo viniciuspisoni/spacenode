@@ -215,7 +215,7 @@ export default function PrivacidadePage() {
           os cookies próprios do parágrafo acima, sem terceiros), <Strong>Análise e desempenho</Strong> e{' '}
           <Strong>Marketing e atribuição</Strong>. Hoje a única categoria com terceiros ativos é a de
           marketing e atribuição, com duas ferramentas de medição de campanha — a tag do Google Ads e o
-          Meta Pixel —, usadas exclusivamente para saber de qual anúncio veio um cadastro. Nenhuma das
+          Meta Pixel com a API de Conversões —, usadas para medir cadastros e assinaturas vindos de anúncios. Nenhuma das
           duas carrega antes de você liberar essa categoria, em <Strong>Aceitar todos</Strong> ou em{' '}
           <Strong>Minhas opções</Strong>: se você escolher <Strong>Recusar opcionais</Strong>, ou
           simplesmente não escolher, nada é enviado ao Google nem à Meta e o site funciona igual. Sua
@@ -224,6 +224,13 @@ export default function PrivacidadePage() {
           parceiros podem usar os dados de navegação coletados após o consentimento para medir e
           segmentar publicidade; consulte as políticas do <Strong>Google</Strong> e da{' '}
           <Strong>Meta</Strong> para detalhes.
+        </P>
+        <P>
+          Com marketing autorizado, a confirmação do cadastro também pode ser enviada pelo servidor à
+          Meta. Esse envio usa a data do cadastro, um identificador da conta transformado por hash,
+          informações do navegador e os identificadores dos cookies de marketing disponíveis. O mesmo
+          identificador do evento é usado no navegador e no servidor para evitar contagem duplicada.
+          Esse evento não inclui seu nome, e-mail, telefone, imagens ou conteúdo de projetos.
         </P>
       </LegalSection>
 

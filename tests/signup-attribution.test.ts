@@ -115,7 +115,7 @@ describe('bind_signup no navegador da confirmação (sem os cookies do anúncio)
   it('reprodução: sem a origem na conta, o cadastro nasce sem campanha', async () => {
     mocks.user = { id: 'u1', created_at: '2026-10-02T12:05:00.000Z', user_metadata: {} }
     const res = await trackPOST(bindRequest({ sn_aid: ANON_B }))
-    expect(await res.json()).toEqual({ ok: true, bound: true })
+    expect(await res.json()).toMatchObject({ ok: true, bound: true })
     expect(mocks.rows[0]).toMatchObject({ event_type: 'signup', campaign_identifier: null, ad_identifier: null, origin: 'unknown' })
   })
 
