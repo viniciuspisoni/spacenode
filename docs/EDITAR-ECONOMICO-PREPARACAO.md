@@ -33,7 +33,7 @@ Os 81,04% e 79,67% anteriores continuam sendo projeções do replay, não margen
 
 ## Idempotência e cobrança
 
-A migração `20261026121901_edit_v4_economic_guardrails.sql` é aditiva e foi testada em Postgres local (PGlite), sem aplicação remota. Usa as tabelas/funções atuais de histórico e carteira do workspace; cria apenas o registro privado do pedido e duas RPCs de controle.
+A migração `20261026121901_edit_v4_economic_guardrails.sql` é aditiva e foi testada em PGlite, Postgres nativo e Supabase local com PostgREST/Auth reais, sem aplicação remota. Usa as tabelas/funções atuais de histórico e carteira do workspace; cria o registro privado do pedido e duas RPCs de controle, além de incluir a coluna e o índice de idempotência ausentes em alguns schemas.
 
 - Repetir o mesmo UUID retorna o resultado concluído ou o estado em andamento. Alterar o conteúdo sob o mesmo UUID é recusado.
 - O browser conserva UUID e payload exatos após perda de resposta, incluindo as URLs originalmente enviadas. Nova intenção ou tentativa explicitamente encerrada recebe novo UUID.
@@ -59,7 +59,7 @@ Regressão opcional nas oito saídas já salvas: definir `EDIT_OFFLINE_REPLAY_RO
 
 ## Antes da liberação
 
-1. Revisar os resultados do Postgres isolado descritos abaixo. Antes de produção, ainda conferir o transporte PostgREST e os advisors do ambiente Supabase de destino, com inferência desligada e autorização própria para qualquer aplicação remota. Não copiar segredos de produção para testes.
+1. Revisar os resultados SQL e HTTP isolados descritos abaixo. PostgREST/Auth, cache de schema e advisors locais passaram em 28/10. Antes de produção, conferir versões/configuração e advisors do destino, com inferência desligada e autorização própria para qualquer aplicação remota. Não copiar segredos de produção para testes.
 2. Manter chamadas pagas e cobrança real desligadas na configuração inicial. Cotações e bloqueio de execução podem ser verificados sem credenciais de provedores.
 3. Autorizar separadamente uma nova rodada com teto global explícito. O saldo de US$15 da rodada anterior **não** é renovado ou reutilizado aqui. Os interruptores de configuração não substituem essa autorização.
 4. Validar leitores/avaliadores Luna e Flash ponta a ponta em pelo menos 24 pedidos de 12 projetos novos, com seleção e resultado de referência humanos. Medir falsa aprovação, falsa rejeição, rejeição técnica, tempo e custo completo por útil. Não tratar as duas repetições determinísticas de cor como testes independentes.
@@ -88,6 +88,19 @@ A migração foi aplicada e reaplicada em PostgreSQL 17.10 nativo, com socket lo
 - Quatro regras SQL oficiais do Supabase/Splinter foram executadas no cluster isolado para os novos objetos: nenhum erro/aviso inesperado. O INFO de RLS sem política na tabela de custos é intencional: clientes não têm acesso e o servidor opera por service-role. Não criar uma política de cliente apenas para suprimir esse INFO.
 
 Os testes financeiros usam as funções reais em dados fictícios, sem provedores de IA. O cluster é encerrado e removido ao final. Essa validação não demonstra precisão dos modelos nem margem de produção. O avaliador do caminho Pro legado continua exigindo validação de disponibilidade antes de liberar o PR.
+
+### Supabase e PostgREST isolados (28/10/2026)
+
+O Supabase CLI oficial 2.122.0 iniciou um ambiente local nativo independente, sem Docker, conta cloud ou projeto remoto vinculado. Versões efetivas: PostgreSQL 17.11, PostgREST 16.5 e Auth 2.197.0. Somente banco, gateway REST e Auth foram ativados. Todas as portas escutaram em `127.0.0.1`, com diretórios/credenciais temporários exclusivos. A estrutura de referência e as funções financeiras reais foram reconstruídas nesse banco vazio; contas foram criadas pelo Auth local e saldos eram fictícios. Nenhum dado ou segredo de produção foi usado.
+
+- **25 cenários HTTP passaram** usando o SDK Supabase real: RPCs após recarga do cache, login e `getUser`, chaves publicável/secreta e JWTs legados locais, RLS do histórico, negação das RPCs/tabela privada a clientes, checkpoint com `update/select/single`, cobrança individual e do escritório, custos Flash de três etapas sem inferência, referência obrigatória, provas inválidas, insuficiência de saldo, concorrência, replay e reaplicação.
+- O gateway e o PostgREST reais devolveram `401/42501` para acesso anônimo e `403/42501` para acesso autenticado à tabela privada. Chaves inválidas e JWT forjado foram recusados. O servidor também não pôde apagar o ledger durável por HTTP.
+- A recarga foi exercitada com `NOTIFY pgrst, 'reload schema'`: a RPC ausente inicialmente retornou `404/PGRST202`; após a migração e a recarga, a assinatura com argumentos nomeados respondeu corretamente. Confirmar propagação do cache no destino durante a implantação autorizada.
+- **Dois testes adicionais do handler real** passaram com SDK/HTTP/banco reais e somente IA/upload substituídos: conclusão com checkpoint durável e perda da resposta após commit, seguida de reconciliação do mesmo UUID. O pipeline e o upload fictícios executaram uma vez e o saldo fictício caiu exatamente 10 Nodes.
+- **210 testes do módulo Editar passaram**, incluindo esses dois, com um replay opcional ignorado. TypeScript, lint do novo teste e diff passaram. O teste `postgrest.test.ts` é opt-in por `EDIT_V4_POSTGREST_TEST_CONFIG`, exige origem local exata e um marcador de dados sintéticos, e bloqueia HTTP fora dessa origem. Na suíte normal sem configuração ele não acessa nenhum serviço. O interruptor de execução é ativado apenas no processo desse teste, com IA substituída; nenhuma configuração remota foi alterada.
+- Advisors oficiais completos rodaram pelo CLI contra a URL local explícita: zero ERROR e zero novos WARN. Sete WARN de desempenho se referem a políticas RLS copiadas e não alteradas pelo PR. O único INFO dos objetos novos continua sendo RLS sem política na tabela privada; a negação de acesso de clientes foi comprovada via HTTP. Não ampliar privilégios para ocultá-lo.
+
+O ambiente e seus dados/credenciais temporários foram descartados após a validação. A prévia e a produção continuam com suas configurações anteriores; não houve merge, migração remota, débito real ou chamada paga. A verificação HTTP não mede precisão, margem real, desempenho em escala, OAuth Google ou disponibilidade do avaliador Pro. Os critérios de modelos/projetos novos descritos acima continuam pendentes.
 
 ## Referências consultadas em 26/10/2026
 
