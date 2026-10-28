@@ -5,8 +5,8 @@
 // O script é injetado por components/analytics/MarketingPixels.tsx; aqui fica
 // só o envio de eventos.
 //
-// ANTES de definir a env em produção: atualizar a cláusula 7 da política de
-// privacidade (hoje promete "sem rastreadores de terceiros").
+// O uso consentido do Pixel e da API de Conversões está descrito na cláusula 7
+// da política de privacidade.
 
 import { marketingConsentClient } from '../consent'
 import type { AnalyticsEvent, AnalyticsProps } from '../events'
@@ -27,15 +27,17 @@ export function metaPixelEnabled(): boolean {
 const STANDARD: Partial<Record<AnalyticsEvent, string>> = {
   plans_viewed:     'ViewContent',
   // Cadastro concluído. Não sai do coletor público (signup_completed é
-  // server-only em CLIENT_EVENTS) — quem chama é SignupConversionPing,
-  // direto no adapter, no mesmo gatilho '?signup=1' do Google Ads.
+  // server-only em CLIENT_EVENTS). AttributionBinder só envia após o servidor
+  // confirmar a conta, com o mesmo eventID do envio pela API de Conversões.
   signup_completed: 'CompleteRegistration',
 }
 
-export function metaPixelTrack(event: AnalyticsEvent, props: AnalyticsProps): void {
-  if (!metaPixelEnabled()) return
-  if (typeof window === 'undefined' || typeof window.fbq !== 'function') return
+export function metaPixelTrack(event: AnalyticsEvent, props: AnalyticsProps, eventId?: string): boolean {
+  if (!metaPixelEnabled()) return false
+  if (typeof window === 'undefined' || typeof window.fbq !== 'function') return false
   const standard = STANDARD[event]
-  if (standard) window.fbq('track', standard, props)
+  if (standard && eventId) window.fbq('track', standard, props, { eventID: eventId })
+  else if (standard) window.fbq('track', standard, props)
   else window.fbq('trackCustom', event, props)
+  return true
 }

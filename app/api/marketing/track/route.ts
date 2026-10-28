@@ -18,12 +18,13 @@ import {
   recordAcquisitionEvent,
 } from '@/lib/marketing/ads/service'
 import { isInternalTraffic } from '@/lib/analytics/internal'
+import { deliverSignupConversion } from '@/lib/analytics/signup-conversion'
 
 // POST /api/marketing/track — rastreamento first-party (rota pública, FORA do
 // namespace admin: é chamada pelo browser de visitantes anônimos e usuários
-// recém-cadastrados). Nada de terceiros — a política de privacidade promete
-// "sem rastreadores de terceiros"; o IP só entra na CHAVE do rate limit, nunca
-// é persistido em evento.
+// recém-cadastrados). O registro first-party independe de consentimento.
+// Após confirmar o cadastro, Meta recebe CompleteRegistration somente quando
+// o cookie atual autoriza marketing; o IP nunca é persistido em evento.
 //
 // Tipos aceitos:
 //   • lp_cta_click — anônimo (sendBeacon do CTA); registra clique numa LP
@@ -109,7 +110,8 @@ export async function POST(req: NextRequest) {
       // `bound` é o que autoriza o cliente a parar de tentar. Antes a resposta
       // era sempre {ok:true} e uma falha de escrita tirava o cadastro do funil
       // para sempre (o browser marcava "já vinculado" e nunca mais chamava).
-      return NextResponse.json({ ok: true, bound })
+      const conversion = bound ? await deliverSignupConversion(admin, user, req) : { status: 'failed' }
+      return NextResponse.json({ ok: true, bound, conversion })
     }
 
     if (body.type === 'lp_cta_click') {

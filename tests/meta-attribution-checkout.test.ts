@@ -184,7 +184,7 @@ describe('clique no anúncio A → venda atribuída à campanha no painel', () =
 
     // 3. Confirmação aberta pelo app de e-mail: 1º acesso ao /app SEM cookies do anúncio.
     const bind = await trackPOST(siteRequest('/api/marketing/track', { type: 'bind_signup' }))
-    expect(await bind.json()).toEqual({ ok: true, bound: true })
+    expect(await bind.json()).toMatchObject({ ok: true, bound: true })
 
     // 4. Primeira imagem (o que /api/generate grava ao concluir a 1ª render).
     await trackServerEvent(db as never, {

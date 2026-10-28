@@ -8,6 +8,11 @@ on:
       - app/lp/**
       - lib/auth/**
       - lib/analytics/**
+      - components/marketing/AttributionBinder.tsx
+      - components/SignupConversionPing.tsx
+      - app/api/marketing/track/route.ts
+      - tests/signup-conversion.test.ts
+      - tests/meta-signup-route.test.ts
       - tests/proxy-plan-intent.test.ts
       - .github/workflows/paid-conversion.yml
 permissions:
@@ -23,5 +28,5 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Verify plan redirects, authentication, checkout attribution and Purchase payloads
-        run: npm test -- tests/proxy-plan-intent.test.ts tests/auth-intent.test.ts tests/auth-cross-browser.test.ts tests/meta-attribution-checkout.test.ts tests/meta-conversions.test.ts
+      - name: Verify authentication, signup delivery, checkout attribution and Purchase payloads
+        run: npm test -- tests/proxy-plan-intent.test.ts tests/auth-intent.test.ts tests/auth-cross-browser.test.ts tests/signup-conversion.test.ts tests/meta-signup-route.test.ts tests/signup-attribution.test.ts tests/meta-attribution-checkout.test.ts tests/meta-conversions.test.ts

@@ -10,6 +10,10 @@
 type Row = Record<string, unknown>
 type Result = { data: unknown; error: { code?: string; message: string } | null }
 
+const field = (row: Row, path: string): unknown => path.split(/->>?/).reduce<unknown>(
+  (value, key) => value && typeof value === 'object' ? (value as Row)[key] : undefined, row,
+)
+
 const asTime = (v: unknown): number | null => {
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(v)) return null
   const t = Date.parse(v)
@@ -102,8 +106,9 @@ export function createMemorySupabase(
       or: (expression: string) => {
         const alternatives = expression.split(',').map(part => {
           const [col, operator, value] = part.split('.')
-          if (operator === 'is' && value === 'null') return (r: Row) => r[col] == null
-          if (operator === 'eq' && value === 'false') return (r: Row) => r[col] === false
+          if (operator === 'is' && value === 'null') return (r: Row) => field(r, col) == null
+          if (operator === 'eq' && value === 'false') return (r: Row) => field(r, col) === false
+          if (operator === 'neq') return (r: Row) => field(r, col) != null && field(r, col) !== value
           throw new Error('Unsupported memory query: ' + part)
         })
         filters.push(r => alternatives.some(f => f(r))); return builder
