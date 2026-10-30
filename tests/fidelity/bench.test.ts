@@ -49,6 +49,7 @@ import { fal } from '@fal-ai/client'
 import { buildFidelityPrompt, type GenerateOptions } from '@/lib/prompts'
 import { ENGINES, getFalEndpoint, isEngineId, isResolution, type EngineId, type Resolution } from '@/lib/engines'
 import { falParamsForEngine } from '@/lib/ai/engine-params'
+import { renderPromptMetadata } from '@/lib/ai/render-prompt-profile'
 import { generateImage } from '@/lib/ai/image-provider'
 import { computeGeometryScore, type GeometryScoreBreakdown } from '@/lib/ai/fidelity/geometry-score'
 import { nearestSupportedAspectRatio } from '@/lib/ai/aspect-ratio'
@@ -62,6 +63,10 @@ import { loadEnvLocal } from '../helpers/env-local'
 loadEnvLocal()
 
 const BENCH_ON = process.env.FIDELITY_BENCH === '1'
+// Paired prompt comparison: keep model, inputs, size and repeats fixed.
+// Legacy remains available as the pre-refactor control; never run by default.
+const LEGACY_PROMPT = process.env.BENCH_PROMPT_PROFILE === 'legacy'
+const PROMPT_LABEL = LEGACY_PROMPT ? 'legacy' : 'model-v1'
 const BENCH_DIR = join(process.cwd(), 'tests', 'fidelity', 'bench')
 const INPUT_DIR = join(BENCH_DIR, 'inputs')
 const REGRESSION_TOLERANCE = 0.05
@@ -80,6 +85,7 @@ type BenchCell =
 interface BenchCase { name: string; file: string; projectType: 'interior' | 'exterior' }
 interface BenchRun extends BenchCase { run: number }
 interface BenchResult {
+  promptProfile?: ReturnType<typeof renderPromptMetadata> | { version: 'legacy' }
   name: string
   run: number
   engine: string
@@ -139,7 +145,7 @@ const OUTPUT_DIR = join(BENCH_DIR, 'outputs')
 function saveOutput(buf: Buffer, name: string, engine: string, run: number): void {
   mkdirSync(OUTPUT_DIR, { recursive: true })
   const safe = (s: string) => s.replace(/[^a-z0-9._-]+/gi, '-')
-  writeFileSync(join(OUTPUT_DIR, `${safe(engine)}--${safe(name)}--${run}.png`), buf)
+  writeFileSync(join(OUTPUT_DIR, `${safe(engine)}--${PROMPT_LABEL}--${safe(name)}--${run}.png`), buf)
 }
 
 async function fetchOutput(url: string): Promise<Buffer> {
@@ -182,7 +188,9 @@ describe.runIf(BENCH_ON)('fidelity bench (API real — FIDELITY_BENCH=1)', () =>
       fidelityMode: 'strict',
       fidelityLevel: 'maximum',
     }
-    const prompt = buildFidelityPrompt(options, 'maximum')
+    const promptEngine = cell.kind === 'orion' ? 'orion' : cell.engine
+    const prompt = buildFidelityPrompt(options, 'maximum', undefined,
+      LEGACY_PROMPT ? undefined : { engine: promptEngine })
     const label = ['Image #1 — REFERENCE IMAGE (mandatory base: geometry, camera, materials and framing are law):']
     const sharp = (await import('sharp')).default
     const meta = await sharp(inputBuf).metadata()
@@ -243,7 +251,8 @@ describe.runIf(BENCH_ON)('fidelity bench (API real — FIDELITY_BENCH=1)', () =>
       const falInput = {
         prompt,
         image_urls: [inputUrl],
-        ...falParamsForEngine(cell.engine, resolution, aspectRatio),
+        ...falParamsForEngine(cell.engine, resolution, aspectRatio,
+          meta.width && meta.height ? { width: meta.width, height: meta.height } : null),
       }
       const gen = await generateImage({
         falEndpoint: getFalEndpoint(cell.engine),
@@ -273,6 +282,7 @@ describe.runIf(BENCH_ON)('fidelity bench (API real — FIDELITY_BENCH=1)', () =>
       }
     }
 
+    result.promptProfile = LEGACY_PROMPT ? { version: 'legacy' } : renderPromptMetadata(promptEngine, prompt)
     results.push(result)
     console.log(
       `[bench] ${name} (${result.engine}): score=${result.geometry.score.toFixed(3)} ` +

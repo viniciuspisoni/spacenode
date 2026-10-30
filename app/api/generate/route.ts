@@ -31,6 +31,7 @@ import {
   isValidCombination,
 } from '@/lib/engines'
 import { falParamsForEngine } from '@/lib/ai/engine-params'
+import { renderPromptMetadata } from '@/lib/ai/render-prompt-profile'
 import { nativeUltraFromFirstAttempt } from '@/lib/ai/fidelity/render-only'
 import { validateNativeEdgeMap } from '@/lib/ai/fidelity/native-edge'
 import { detectClient } from '@/lib/sketchup/client-info'
@@ -890,6 +891,10 @@ export async function POST(req: NextRequest) {
       }
 
       finalPrompt = buildFidelityPrompt(options, fidelityLevel, resolvedBriefing, {
+        engine,
+        canvasContract: sourceFrame
+          ? `CANVAS CONTRACT: output ${sourceFrame.aspectRatio}. The GEOMETRY SOURCE has temporary gray margins (left ${sourceFrame.left}, right ${sourceFrame.right}, top ${sourceFrame.top}, bottom ${sourceFrame.bottom} pixels on a ${sourceFrame.canvasWidth}x${sourceFrame.canvasHeight} canvas). Preserve those margins and the exact source framing inside them. Do not fill the margins with architecture or expand the room. Auxiliary maps describe the source content, excluding these margins.`
+          : undefined,
         attempt: ladderAttempt,
         edgeMapImageIndex,
         edgeMapNative: edgeMapNative && edgeMapImageIndex !== null,
@@ -897,9 +902,6 @@ export async function POST(req: NextRequest) {
         materialRegionSheet,
         materialSamples: materialSamples.length > 0 ? materialSamples : undefined,
       })
-      if (sourceFrame) {
-        finalPrompt += `\nCANVAS CONTRACT: output ${sourceFrame.aspectRatio}. The GEOMETRY SOURCE has temporary gray margins (left ${sourceFrame.left}, right ${sourceFrame.right}, top ${sourceFrame.top}, bottom ${sourceFrame.bottom} pixels on a ${sourceFrame.canvasWidth}x${sourceFrame.canvasHeight} canvas). Preserve those margins and the exact source framing inside them. Do not fill the margins with architecture or expand the room. Auxiliary maps describe the source content, excluding these margins.`
-      }
       devLog('[generate] prompt     :', finalPrompt)
 
       const attemptSeed = generationSeed + params.seedOffset
@@ -930,9 +932,8 @@ export async function POST(req: NextRequest) {
         if (isOrion) {
           // Sem seed, sem thinking_level, sem resolution: nada de parâmetro de
           // Gemini/Seedream/GPT Image 2 num schema que não os tem. As
-          // INSTRUÇÕES são as mesmas dos outros motores (mesmo
-          // buildFidelityPrompt, mesma ordem de imagens) — é o que torna a
-          // comparação honesta.
+          // Contrato de preservação comum, expresso no perfil GPT Image;
+          // os índices continuam correspondendo à ordem real das imagens.
           orionGen = await generateOrionImage({
             observe: observeApiCall,
             variant:   orionVariant,
@@ -1245,6 +1246,7 @@ export async function POST(req: NextRequest) {
       // pra uso futuro de QA interna gratuita; nenhum motor grava true hoje.
       is_internal_test: false,
       generation_log: {
+        prompt_profile: renderPromptMetadata(engine, finalPrompt),
         provider:       gen.provider,
         provider_model: gen.providerModel,
         fallback_used:  gen.fallbackUsed,
