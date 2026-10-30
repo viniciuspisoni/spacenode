@@ -931,7 +931,7 @@ export async function POST(req: NextRequest) {
       try {
         if (isOrion) {
           // Sem seed, sem thinking_level, sem resolution: nada de parâmetro de
-          // Gemini/Seedream/GPT Image 2 num schema que não os tem. As
+          // Gemini/Seedream/GPT Image 2 num schema que não os tem.
           // Contrato de preservação comum, expresso no perfil GPT Image;
           // os índices continuam correspondendo à ordem real das imagens.
           orionGen = await generateOrionImage({
