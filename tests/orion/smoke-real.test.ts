@@ -65,7 +65,7 @@ describe.runIf(SMOKE_ON)('Orion · smoke real (ORION_SMOKE=1 — chamada paga)',
       fidelityMode: 'strict',
       fidelityLevel: 'maximum',
     }
-    const prompt = buildFidelityPrompt(options, 'maximum')
+    const prompt = buildFidelityPrompt(options, 'maximum', undefined, { engine: 'orion' })
 
     // data: URL — fetchStorageBytes aceita e manda os bytes no corpo. Sem
     // Storage, sem FAL_KEY, sem banco: prova a rota direta isolada.

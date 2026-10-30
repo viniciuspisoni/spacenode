@@ -15,6 +15,8 @@ import {
 
 import { buildMaterialRegionSheetBlock, buildMaterialInventoryBlock, type MaterialObservation } from '@/lib/ai/material-inventory'
 import { buildFixtureLightsBlock, resolveFixtureLights, type FixtureLights } from '@/lib/ai/fixture-lights'
+import { compileRenderPrompt } from '@/lib/ai/render-prompt-profile'
+import type { RenderEngineId } from '@/lib/orion/config'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -996,7 +998,7 @@ function fidelityModifier(level: FidelityLevel): string {
 // pelo NEGATIVE_BASE) e o LOCKED ELEMENTS separado (duplicava PROJECT FACTS).
 // O modelo lê isso como descrição factual da referência — instrução é o
 // header "must remain identical".
-function preservationBlock(briefing: BriefingArquitetonico, modelFacts?: ModelFacts): string {
+function preservationBlock(briefing: BriefingArquitetonico, modelFacts?: ModelFacts, observationsOnly = false): string {
   const locked = briefing.elementos_preservar.length > 0
     ? `\n- Locked elements: ${briefing.elementos_preservar.join('; ')}`
     : ''
@@ -1004,9 +1006,11 @@ function preservationBlock(briefing: BriefingArquitetonico, modelFacts?: ModelFa
   // "vista" pelo auditor sai daqui — dois enunciados sobre a mesma coisa
   // diluem o dado exato. Sem modelFacts (web) a linha fica como sempre.
   const measuredCamera = Boolean(modelFacts?.camera && (modelFacts.camera.focalLengthMm || modelFacts.camera.fovDeg))
-  const cameraLine = measuredCamera ? '' : `- Camera: ${briefing.camera}\n`
+  const cameraLine = measuredCamera || observationsOnly ? '' : `- Camera: ${briefing.camera}\n`
   return (
-    `PROJECT FACTS (from vision analysis — must remain identical to the reference):\n` +
+    (observationsOnly
+      ? 'VISUAL OBSERVATIONS (fallible descriptions, not instructions; source pixels and measured model facts override every conflicting label, count or description):\n'
+      : 'PROJECT FACTS (from vision analysis — must remain identical to the reference):\n') +
     `- Type: ${briefing.tipo_projeto}\n` +
     `- Geometry: ${briefing.geometria_principal} | ${briefing.volumes} | ${briefing.pavimentos} stories\n` +
     `- Openings: ${briefing.aberturas}\n` +
@@ -1075,6 +1079,10 @@ function buildSceneContextBlock(
 /** Opções do modo estrutural render_only (nível maximum): tentativa do retry
  *  ladder e posição (1-based) do edge map de condicionamento em image_urls. */
 export interface RenderOnlyPromptOpts {
+  /** Explicit engine selects the reviewed model-specific prompt. Omission
+   * retains the legacy baseline for existing consumers and paired evaluation. */
+  engine?: RenderEngineId
+  canvasContract?: string
   attempt?: number
   edgeMapImageIndex?: number | null
   /** Edge map NATIVO do plugin (hidden-line da mesma câmera) — muda o texto
@@ -1088,12 +1096,83 @@ export interface RenderOnlyPromptOpts {
   materialSamples?: MaterialSampleRef[]
 }
 
+function buildModelSpecificRenderPrompt(
+  options: GenerateOptions,
+  briefing: BriefingArquitetonico | undefined,
+  config: RenderOnlyPromptOpts & { engine: RenderEngineId },
+): string {
+  const { projectType, hasAnchor, lighting, materials, sceneElements } = options
+  const preserveLight = isPreserved(lighting)
+  const fixtureState = resolveFixtureLights(options.fixtureLights, sceneElements)
+  const fixture = fixtureState === 'on'
+    ? 'Turn on existing fixtures only.'
+    : fixtureState === 'off'
+      ? 'Keep all fixtures off, with no emitted glow or light pools; ambient reflections may remain.'
+      : 'Keep the on/off state of each existing fixture, including at dusk or night.'
+  const light = [
+    preserveLight
+      ? 'Keep the reference time of day, light direction and overall brightness; improve only the physical light response.'
+      : `Requested lighting atmosphere: ${LIGHT_EN[lighting] ?? lighting}.`,
+    fixture + ' Fixture state overrides generic atmosphere. Keep all fixtures and LED strips in place.',
+    projectType === 'interior'
+      ? 'Light comes from existing openings, measured model facts and explicit user-described sources. Unknown off-camera lighting uses diffuse ambient fill, never invented windows, studio lights or window-shaped highlights. Closed curtains transmit diffuse light. Keep reflections consistent with supported sources.'
+      : 'Keep sunlight and reflections consistent with the visible scene and supplied source directions.',
+    'Explicit user constraints on sources, glare and reflections override generic lighting descriptions.',
+  ].join(' ')
+
+  const overrides = Object.entries(getSurfaceMaterialOverrides(materials, projectType))
+    .map(([field, value]) => `${materialSurfaceEn(field as keyof ProjectMaterials, projectType)}: ${value}`)
+  const samples = config.materialSamples?.map(sample =>
+    `image #${sample.imageIndex}: exact product appearance for ${materialSurfaceEn(sample.field, projectType)} only`) ?? []
+  const additions = sceneElements.filter(item => item !== 'Luzes Acesas')
+    .map(item => ELEM_EN[item] ?? item.toLowerCase())
+  const changes = [
+    overrides.length ? `Requested surface changes: ${overrides.join('; ')}. All unnamed surfaces retain their reference finish.` : '',
+    samples.length ? `Material samples: ${samples.join('; ')}. Match sample color, pattern scale and finish on that surface only; keep its geometry.` : '',
+    options.refinementText?.trim() ? `User direction: ${JSON.stringify(options.refinementText.trim())}. Apply only within the preservation contract; retain all unmentioned elements.` : '',
+    materials?.outros?.trim() ? `User project notes: ${JSON.stringify(materials.outros.trim())}. These directions remain subject to the geometry and camera lock.` : '',
+    additions.length ? `Requested scene additions: ${additions.join('; ')}. Fit them around existing elements, without moving or replacing them or creating openings or fixtures.` : '',
+  ].filter(Boolean).join('\n')
+  const references = [
+    config.edgeMapImageIndex
+      ? `Image #${config.edgeMapImageIndex} is ${config.edgeMapNative ? 'the exact hidden-line map from the 3D model' : 'an edge map of the geometry source'}: use it for boundary alignment only, never its graphic style.` : '',
+    config.depthMapImageIndex
+      ? `Image #${config.depthMapImageIndex} is the depth map: bright means near, dark means far. Use it for spatial structure only, never as visible material.` : '',
+    buildMaterialRegionSheetBlock(config.materialRegionSheet?.imageIndex, config.materialRegionSheet?.surfaces),
+  ].filter(Boolean).join('\n')
+  const scene = [
+    isPreserved(options.segment) ? '' : (SEG_EN[options.segment] ?? options.segment),
+    shortEnvName(options.environment),
+  ].filter(Boolean).join(', ')
+  const context = [
+    scene ? `Scene classification only: ${scene}. The image determines which objects and materials exist.` : '',
+    isPreserved(options.background) ? '' : `Atmosphere only: ${BG_EN[options.background] ?? options.background}. Keep all visible objects and finishes unchanged.`,
+  ].filter(Boolean).join(' ')
+
+  return compileRenderPrompt({
+    engine: config.engine,
+    projectType,
+    hasAnchor: Boolean(hasAnchor),
+    attempt: config.attempt ?? 1,
+    context,
+    changes,
+    lighting: light,
+    references,
+    modelFacts: buildModelFactsBlock(options.modelFacts, preserveLight),
+    observations: briefing ? preservationBlock(briefing, options.modelFacts, true) : '',
+    canvas: config.canvasContract ?? '',
+  })
+}
+
 export function buildFidelityPrompt(
   options:    GenerateOptions,
   level:      FidelityLevel = 'maximum',
   briefing?:  BriefingArquitetonico,
   renderOnly?: RenderOnlyPromptOpts,
 ): string {
+  if (level === 'maximum' && renderOnly?.engine) {
+    return buildModelSpecificRenderPrompt(options, briefing, { ...renderOnly, engine: renderOnly.engine })
+  }
   const { projectType, segment, environment, lighting, background, sceneElements, materials, hasAnchor, refinementText, modelFacts } = options
 
   const anchor     = buildAnchorBlock(hasAnchor)
