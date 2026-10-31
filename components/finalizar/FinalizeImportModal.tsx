@@ -156,7 +156,7 @@ export function FinalizeImportModal({ open, purpose, onClose, onSelect }: Props)
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
           {current.map((item) => (
             <button key={item.id} type="button" className="spn-glass" onClick={() => onSelect(item.url)}
-              title={`${item.label} · ${item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR') : ''}`}
+              title={`${item.label} · ${item.createdAt ? new Date(item.createdAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : ''}`}
               style={{ position: 'relative', aspectRatio: '4 / 3', borderRadius: 'var(--r-inner)', overflow: 'hidden', cursor: 'pointer', padding: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={toMediaProxyUrl(item.url) ?? item.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
