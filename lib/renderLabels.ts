@@ -3,6 +3,7 @@ const VIDEO_ENGINE_LABELS: Record<string, string> = {
   'fal-ai/kling-video/v3/pro/image-to-video':             'Cinemático (legado)',
   'fal-ai/veo3.1/image-to-video':                         'Cinemático',
   'bytedance/seedance-2.0/image-to-video':                'Arquitetônico',
+  'ark/seedance-2.0/image-to-video':                      'Natural',
 }
 
 const VIDEO_LABEL_VALUES = new Set(Object.values(VIDEO_ENGINE_LABELS))
