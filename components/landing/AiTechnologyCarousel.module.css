@@ -5,6 +5,7 @@
   margin: 0 auto;
   padding: 16px 24px 96px;
   color: var(--color-text-primary);
+  scroll-margin-top: 92px;
 }
 
 .heading {
@@ -45,19 +46,18 @@
 .track { position: relative; display: flex; gap: 12px; margin: 0 -5px; padding: 5px 5px 14px; list-style: none; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding: 5px; scrollbar-width: thin; scrollbar-color: var(--color-border-strong) transparent; -webkit-overflow-scrolling: touch; }
 .track::-webkit-scrollbar { height: 4px; }
 .track::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 999px; }
-.card { flex: 0 0 178px; scroll-snap-align: start; }
-.brandButton { display: flex; align-items: center; flex-direction: column; width: 100%; min-height: 176px; padding: 24px 16px 16px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-bg-elevated); color: var(--color-text-primary); cursor: pointer; transition: background 180ms, border-color 180ms; text-align: center; }
-.brandButton:hover { background: var(--color-surface-hover); border-color: var(--color-border-strong); }
-.brandButton[aria-pressed='true'] { border-color: var(--color-text-secondary); background: var(--color-surface-hover); }
-.logoSlot { display: flex; align-items: center; justify-content: center; width: 130px; height: 42px; margin-bottom: 18px; }
-.logoSlot[data-surface='light'] { background: #f7f7f5; border-radius: 6px; }
-.logoSlot[data-surface='light'] .logo { max-width: 100px; }
-.logo { display: block; width: auto; max-width: 124px; height: auto; max-height: 36px; object-fit: contain; user-select: none; }
-.brandName { font-size: 14px; font-weight: 500; letter-spacing: -.01em; line-height: 1.4; }
-.models { margin-top: 4px; font-size: 11px; line-height: 1.5; color: var(--color-text-tertiary); }
-.selection { margin-top: 13px; font-size: 10px; line-height: 1.4; color: var(--color-text-secondary); }
-.brandButton[aria-pressed='true'] .selection::before { content: ''; display: inline-block; width: 4px; height: 4px; margin: 0 5px 2px 0; border-radius: 50%; background: currentColor; }
-.detail { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 32px; align-items: center; min-height: 152px; padding: 26px 28px; margin-top: 12px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-bg-elevated); }
+.card { flex: 0 0 148px; scroll-snap-align: start; }
+.brandButton { position: relative; display: flex; align-items: center; flex-direction: column; width: 100%; min-height: 110px; padding: 15px 8px 18px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--color-text-primary); cursor: pointer; transition: background 180ms; text-align: center; }
+.brandButton:hover { background: var(--color-surface-hover); }
+.brandButton[aria-pressed='true'] { background: var(--color-surface); }
+.brandButton::after { content: ''; position: absolute; bottom: 0; left: 32px; right: 32px; height: 1px; background: transparent; }
+.brandButton[aria-pressed='true']::after { background: var(--color-text-secondary); }
+.logoSlot { display: flex; align-items: center; justify-content: center; width: 124px; height: 42px; margin-bottom: 12px; }
+.logo { display: block; flex-shrink: 0; width: auto; max-width: 108px; height: auto; max-height: 28px; object-fit: contain; user-select: none; }
+/* The official PNG includes its clear space; preserve the complete asset. */
+.logo[data-brand='openai'] { width: 136px; max-width: 136px; height: 68px; max-height: none; }
+.brandName { font-size: 11px; font-weight: 400; letter-spacing: -.005em; line-height: 1.4; color: var(--color-text-secondary); }
+.detail { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; align-items: center; min-height: 128px; padding: 22px 0; margin-top: 12px; border-top: 1px solid var(--color-border); }
 .detailLabel { display: grid; grid-template-columns: 1fr; gap: 5px; }
 .counter { color: var(--color-text-tertiary); font-size: 10px; font-variant-numeric: tabular-nums; letter-spacing: .08em; }
 .detailLabel h3 { margin: 3px 0 0; font-size: 19px; line-height: 1.3; font-weight: 500; letter-spacing: -.025em; }
@@ -77,10 +77,10 @@
   .playButton { width: 44px; padding: 0; }
   .playButton span { display: none; }
   .controls { gap: 6px; }
-  .card { flex-basis: 158px; }
-  .brandButton { min-height: 168px; padding: 20px 12px 14px; }
-  .logoSlot { margin-bottom: 16px; }
-  .detail { grid-template-columns: 1fr; align-items: start; gap: 16px; min-height: 230px; padding: 22px 20px; }
+  .card { flex-basis: 128px; }
+  .brandButton { min-height: 104px; padding: 13px 2px 16px; }
+  .logoSlot { width: 120px; margin-bottom: 10px; }
+  .detail { grid-template-columns: 1fr; align-content: start; align-items: start; gap: 12px; min-height: 176px; padding: 20px 0; }
   .detailLabel { position: relative; padding-right: 58px; }
   .counter { position: absolute; top: 3px; right: 0; }
   .detailLabel h3 { margin-top: 0; }
