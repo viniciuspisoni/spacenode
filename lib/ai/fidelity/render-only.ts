@@ -146,8 +146,12 @@ export function buildPhotographicBlock(projectNoun: 'building' | 'space'): strin
     'Light must be physically coherent: one consistent sun direction, contact shadows where volumes meet, ' +
     'soft ambient occlusion in recesses and under overhangs, and bounced light on shaded faces. ' +
     (outdoor
-      ? 'Outdoor: natural sky gradient, atmospheric depth on distant volumes, believable vegetation and ground. '
-      : 'Indoor: believable light falloff from the openings and fixtures actually present in the scene. ') +
+      ? 'Outdoor: render ONLY the sky, ground, vegetation and distant context that are visible in the reference. ' +
+        'An empty or unmodeled background stays neutral; do not turn it into a landscape, garden, pool or neighboring building unless explicitly requested. ' +
+        'Give existing slab edges and recesses coherent light, thickness and contact shadows without changing their contours. '
+      : 'Indoor: believable light falloff from the openings and fixtures actually present in the scene. ' +
+        'Separate adjacent surfaces with contact shadows and reflected light, not stronger outlines, new decorations or altered finishes. ' +
+        'Keep pale surfaces, colored fabrics and glass readable without clipped highlights, crushed shadows or exaggerated gloss. ') +
     'Sharpness is natural and photographic — crisp where the lens focuses, never over-sharpened, ' +
     'never an edge-enhancement halo around contours. '
   )
@@ -265,7 +269,7 @@ export function buildRenderOnlyCameraBlock(hasAnchor: boolean): string {
   if (hasAnchor) {
     return ', high quality photorealistic image, sharp focus, no compression artifacts'
   }
-  return ', photorealistic architectural photograph of this exact scene — retain the visible surface colors and patterns; use realistic light transport with soft natural shadows, ambient occlusion and global illumination, accurate reflections and refraction on glass and water, true-to-life sky and vegetation, subtle depth of field, sharp focus. It must read as a real DSLR photograph, NOT a flat CGI / 3D / SketchUp render. Keep every material, color and finish exactly as shown — only their real-world rendering and lighting become photographic, never the design.'
+  return ', photorealistic architectural photograph of this exact scene — retain the visible surface colors and patterns; use realistic light transport with soft natural shadows, ambient occlusion and global illumination. Reflections and refraction belong only to existing reflective surfaces; do not add mirrors, glazing or water to create them. Preserve the reference framing and depth of field; keep architectural details readable without invented blur or sharpening halos. Existing sky and vegetation may become photographically lit, but an empty context stays empty unless an explicit scene addition requests otherwise. It must read as a real photograph of the same project. Keep every material, color and finish exactly as shown — only their light response becomes photographic, never the design.'
 }
 
 // ── Cabeça do system prompt (aplicada ANTES dos blocos do usuário) ────────────

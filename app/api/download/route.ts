@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { downloadMetadata } from '@/lib/media/download-metadata'
 
 // Proxy de download. Recebe a URL da imagem (CDN do FAL), busca server-side
 // e devolve com header Content-Disposition: attachment, forçando o browser a
@@ -48,16 +49,13 @@ export async function GET(req: NextRequest) {
       return new NextResponse('upstream error', { status: 502 })
     }
 
-    const contentType = upstream.headers.get('content-type') ?? 'image/jpeg'
     const buffer      = await upstream.arrayBuffer()
-
-    // Sanitiza filename pra evitar header injection
-    const safeName = filename.replace(/[^\w.\-]/g, '_').slice(0, 120)
+    const metadata = downloadMetadata(new Uint8Array(buffer), upstream.headers.get('content-type'), filename)
 
     return new NextResponse(buffer, {
       headers: {
-        'Content-Type':        contentType,
-        'Content-Disposition': `attachment; filename="${safeName}"`,
+        'Content-Type':        metadata.contentType,
+        'Content-Disposition': `attachment; filename="${metadata.filename}"`,
         'Cache-Control':       'private, no-store',
       },
     })
