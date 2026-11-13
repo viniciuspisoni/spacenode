@@ -137,7 +137,7 @@ function PlanCard({ planId, billing, loading, onSelect }: {
       </div>
 
       {billing === 'annual' && (
-        <p className="spn-plan-annual">R$ {formatBRL(plan.annualTotal)} cobrado anualmente</p>
+        <p className="spn-plan-annual">R$ {formatBRL(plan.annualTotal)} cobrados anualmente</p>
       )}
 
       <div className="spn-plan-nodes">
@@ -234,8 +234,8 @@ function PlanCard({ planId, billing, loading, onSelect }: {
         }
         .spn-plan-period { font-size: 13px; color: var(--color-text-tertiary); }
         .spn-plan-annual {
-          font-size: 10.5px;
-          color: var(--color-text-tertiary);
+          font-size: 12px;
+          color: var(--color-text-secondary);
           margin: -10px 0 14px;
         }
         .spn-plan-nodes {
@@ -360,7 +360,7 @@ export function PricingToggle() {
     observer.observe(node)
     return () => observer.disconnect()
   }, [])
-  const [billing, setBilling]         = useState<BillingCycle>('monthly')
+  const [billing, setBilling]         = useState<BillingCycle>(ANNUAL_BILLING_ENABLED ? 'annual' : 'monthly')
   const [loading, setLoading]         = useState<string | null>(null)
   const [renders, setRenders]         = useState(40)
   const [qualityCost, setQualityCost] = useState(10)
