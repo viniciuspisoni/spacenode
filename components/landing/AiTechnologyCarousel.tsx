@@ -16,7 +16,7 @@ const TECHNOLOGIES = [
     id: 'openai',
     name: 'OpenAI',
     models: 'GPT Image',
-    logo: '/brand/ai/openai.svg',
+    logo: '/brand/ai/openai-white.png',
     category: 'Criação de imagens',
     description: 'A tecnologia de imagem da OpenAI está integrada ao motor Orion para gerar novas visualizações a partir do seu projeto.',
   },
@@ -190,7 +190,7 @@ export function AiTechnologyCarousel() {
       </div>
 
       <div className={styles.toolbar}>
-        <p id={`${id}-hint`} className={styles.hint}>Conheça a tecnologia por trás de cada recurso.</p>
+        <p id={`${id}-hint`} className={styles.hint}>Toque em um logo para conhecer.</p>
         <div className={styles.controls}>
           {!reducedMotion && (
             <button type="button" className={styles.playButton} onClick={() => {
@@ -223,20 +223,19 @@ export function AiTechnologyCarousel() {
               ref={element => { buttonRefs.current[index] = element }}
               type="button"
               className={styles.brandButton}
+              aria-label={`${technology.name} ${technology.models}`}
               aria-pressed={selectedIndex === index}
               aria-controls={`${id}-detail`}
               onClick={() => select(index)}
               onKeyDown={event => handleKeyDown(event, index)}
               onFocus={() => reveal(index)}
             >
-              <span className={styles.logoSlot} data-surface={technology.id === 'openai' ? 'light' : undefined}>
+              <span className={styles.logoSlot}>
                 {/* Brand assets stay unmodified, including their approved colors. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className={styles.logo} src={technology.logo} alt="" width="124" height="36" loading="lazy" draggable="false" />
+                <img className={styles.logo} data-brand={technology.id} src={technology.logo} alt="" width={technology.id === 'openai' ? 800 : 124} height={technology.id === 'openai' ? 400 : 36} loading="lazy" draggable="false" />
               </span>
               <span className={styles.brandName}>{technology.name}</span>
-              <span className={styles.models}>{technology.models}</span>
-              <span className={styles.selection} aria-hidden="true">{selectedIndex === index ? 'Em destaque' : 'Conhecer'}</span>
             </button>
           </li>
         ))}
@@ -246,7 +245,7 @@ export function AiTechnologyCarousel() {
         <div className={styles.detailLabel}>
           <span className={styles.counter} aria-hidden="true">{String(selectedIndex + 1).padStart(2, '0')} / {String(TECHNOLOGIES.length).padStart(2, '0')}</span>
           <h3 id={`${id}-detail-title`}>{selected.name}</h3>
-          <p>{selected.category}</p>
+          <p>{selected.models} · {selected.category}</p>
         </div>
         <p className={styles.description}>{selected.description}</p>
       </div>
