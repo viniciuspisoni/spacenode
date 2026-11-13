@@ -53,7 +53,7 @@ function fallbackAnalysis(reason: 'disabled' | 'failed'): VideoReferenceAnalysis
     architectureType:      scene.archetype,
     suggestedCameraMotion: motion.id,
     suggestedPrompt:
-      'Câmera avançando lentamente pela cena, preservando geometria, materiais e iluminação originais.',
+      'Take contínuo com aproximação curta dentro da composição visível, preservando geometria, materiais e luz originais.',
     suggestedModelId:      DEFAULT_VIDEO_MODEL_ID,
     suggestedDuration:     motion.recommendedDuration,
     suggestedAspectRatio:  motion.recommendedAspectRatio,
@@ -105,7 +105,7 @@ function buildSuggestedPrompt(briefing: BriefingArquitetonico, sceneType: SceneT
   const scene = SCENE_TYPES[sceneType]
   const tipo  = briefing.tipo_projeto || scene.label.toLowerCase()
   return (
-    `Movimento de câmera contido em ${tipo}, ` +
+    `Take contínuo com movimento curto na composição visível de ${tipo}, ` +
     'preservando geometria, materiais, mobiliário e iluminação originais.'
   )
 }
@@ -145,7 +145,7 @@ export async function analyzeVideoReferenceImage(
       suggestedDuration:     motion.recommendedDuration,
       suggestedAspectRatio:  motion.recommendedAspectRatio,
       fidelityNotes:         deriveFidelityNotes(briefing),
-      warnings:              [],
+      warnings:              ['A imagem orienta uma vista local; áreas ocultas não foram verificadas pela análise.'],
       briefing,
       source:                'ai',
     }

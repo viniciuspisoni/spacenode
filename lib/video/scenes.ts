@@ -6,8 +6,7 @@
 //   - defaultMotionId:  movimento de câmera sugerido (referenciado em cameraPresets.ts)
 //   - aliases:          rótulos comuns que a análise da imagem pode devolver
 //
-// Os fragmentos preservam o estilo dos prompts que estavam em route.ts —
-// movimento contido, parallax, profundidade rasa, sensação anamórfica.
+// Contexto descritivo apenas: câmera e luz são resolvidas pela política do take.
 
 export type SceneArchetype = 'interior' | 'exterior' | 'facade' | 'commercial' | 'social'
 
@@ -41,9 +40,7 @@ export const SCENE_TYPES: Record<SceneTypeId, SceneType> = {
     label:          'Sala',
     description:    'Estar, jantar, área social interna',
     promptFragment:
-      'living room interior, gentle parallax between foreground furniture and background wall, ' +
-      'soft natural light wash from windows, shallow depth of field on foreground objects, ' +
-      'anamorphic cinematic feel',
+      'the living or dining space already shown in the reference',
     defaultMotionId: 'dolly-in-soft',
     aliases:         ['sala', 'estar', 'jantar', 'living', 'social', 'lounge'],
   },
@@ -54,9 +51,8 @@ export const SCENE_TYPES: Record<SceneTypeId, SceneType> = {
     label:          'Cozinha',
     description:    'Cozinha, copa, ilha gourmet',
     promptFragment:
-      'kitchen interior with island and pendant lights, soft natural light from windows, ' +
-      'shallow depth of field on foreground chairs and table, anamorphic cinematic feel',
-    defaultMotionId: 'enter-room',
+      'the kitchen already shown in the reference, keeping its existing cabinetry and appliances',
+    defaultMotionId: 'dolly-in-soft',
     aliases:         ['cozinha', 'kitchen', 'gourmet', 'copa'],
   },
 
@@ -66,8 +62,7 @@ export const SCENE_TYPES: Record<SceneTypeId, SceneType> = {
     label:          'Quarto',
     description:    'Dormitório, suíte, quarto principal',
     promptFragment:
-      'bedroom interior, soft warm ambient light, intimate and contemplative atmosphere, ' +
-      'shallow depth of field, anamorphic cinematic feel',
+      'the bedroom already shown in the reference',
     defaultMotionId: 'lateral-tracking',
     aliases:         ['quarto', 'dormitório', 'bedroom', 'suíte', 'suite'],
   },
@@ -78,8 +73,7 @@ export const SCENE_TYPES: Record<SceneTypeId, SceneType> = {
     label:          'Banheiro',
     description:    'Lavabo, banheiro, spa',
     promptFragment:
-      'bathroom interior, soft diffuse lighting, polished surfaces and tilework, ' +
-      'shallow depth of field, contemplative pace',
+      'the bathroom already shown in the reference, keeping its existing finishes and fixtures',
     defaultMotionId: 'parallax-subtle',
     aliases:         ['banheiro', 'lavabo', 'bathroom', 'spa', 'wc'],
   },
@@ -90,8 +84,7 @@ export const SCENE_TYPES: Record<SceneTypeId, SceneType> = {
     label:          'Escritório',
     description:    'Home office, sala comercial, coworking',
     promptFragment:
-      'office interior with desk and shelving, soft natural light, focused contemplative mood, ' +
-      'shallow depth of field, professional pacing',
+      'the workspace already shown in the reference',
     defaultMotionId: 'dolly-in-soft',
     aliases:         ['escritório', 'home office', 'office', 'workspace', 'estudio'],
   },
@@ -102,8 +95,7 @@ export const SCENE_TYPES: Record<SceneTypeId, SceneType> = {
     label:          'Comercial',
     description:    'Recepção, loja, restaurante, espaço corporativo',
     promptFragment:
-      'commercial interior, premium hospitality atmosphere, soft directional light, ' +
-      'institutional but warm tone, anamorphic cinematic feel',
+      'the commercial space already shown in the reference',
     defaultMotionId: 'institutional-reveal',
     aliases:         ['comercial', 'loja', 'restaurante', 'recepção', 'showroom', 'hotel'],
   },
@@ -114,8 +106,7 @@ export const SCENE_TYPES: Record<SceneTypeId, SceneType> = {
     label:          'Fachada',
     description:    'Elevação principal, vista frontal do edifício',
     promptFragment:
-      'architectural facade, golden hour atmospheric light, parallax between foreground ' +
-      'landscape and architecture, cinematic real estate hero shot',
+      'the visible architectural elevation already shown in the reference',
     defaultMotionId: 'facade-reveal',
     aliases:         ['fachada', 'facade', 'elevation', 'frente', 'frontal'],
   },
@@ -126,8 +117,7 @@ export const SCENE_TYPES: Record<SceneTypeId, SceneType> = {
     label:          'Varanda',
     description:    'Terraço, varanda, sacada com vista',
     promptFragment:
-      'terrace with open view, parallax between architectural foreground and distant horizon, ' +
-      'golden atmospheric light, cinematic outdoor reveal',
+      'the terrace and visible view already shown in the reference',
     defaultMotionId: 'horizontal-pan',
     aliases:         ['varanda', 'terraço', 'sacada', 'terrace', 'balcony'],
   },
@@ -138,9 +128,8 @@ export const SCENE_TYPES: Record<SceneTypeId, SceneType> = {
     label:          'Área externa',
     description:    'Jardim, piscina, paisagismo, área de lazer',
     promptFragment:
-      'exterior landscape area with vegetation, soft natural light, gentle ambient atmosphere, ' +
-      'shallow depth of field on foreground elements',
-    defaultMotionId: 'drone-soft',
+      'the exterior area and landscape already shown in the reference',
+    defaultMotionId: 'parallax-subtle',
     aliases:         ['externa', 'jardim', 'piscina', 'exterior', 'paisagismo', 'lazer'],
   },
 
@@ -150,8 +139,7 @@ export const SCENE_TYPES: Record<SceneTypeId, SceneType> = {
     label:          'Detalhe',
     description:    'Close em material, mobiliário, elemento construtivo',
     promptFragment:
-      'architectural detail close framing, gentle focus pull effect, intimate framing, ' +
-      'shallow depth of field highlighting materials and texture, contemplative pace',
+      'the architectural detail already shown in the reference, maintaining readable surface detail',
     defaultMotionId: 'zoom-editorial',
     aliases:         ['detalhe', 'detail', 'close', 'macro'],
   },
@@ -162,8 +150,7 @@ export const SCENE_TYPES: Record<SceneTypeId, SceneType> = {
     label:          'Câmera fixa',
     description:    'Movimento ambiental sem translação de câmera',
     promptFragment:
-      'static locked-off composition. Subtle environmental life only — soft natural light shifts, ' +
-      'gentle ambient atmosphere. Contemplative architectural composition.',
+      'the architectural composition already shown in the reference',
     defaultMotionId: 'static-ambient',
     aliases:         ['fixa', 'estática', 'static', 'parada'],
   },
@@ -186,11 +173,11 @@ export const SCENE_TYPE_ORDER: SceneTypeId[] = [
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 export function getSceneType(id: string): SceneType | undefined {
-  return SCENE_TYPES[id as SceneTypeId]
+  return Object.hasOwn(SCENE_TYPES, id) ? SCENE_TYPES[id as SceneTypeId] : undefined
 }
 
 export function isSceneTypeId(id: string): id is SceneTypeId {
-  return id in SCENE_TYPES
+  return Object.hasOwn(SCENE_TYPES, id)
 }
 
 // Best-effort: dado um texto livre (briefing.tipo_projeto), tenta deduzir

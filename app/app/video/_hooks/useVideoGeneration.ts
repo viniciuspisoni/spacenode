@@ -10,12 +10,16 @@ import { useCallback } from 'react'
 import { resolveMotion, type AnimateState, type AnimateDispatch } from './useAnimateState'
 import { uploadDirect } from '@/lib/storage/direct-upload-client'
 import { jsonOrNull } from '@/lib/http/fetch-json'
+import { requireVideoModel } from '@/lib/video/models'
+import { isCameraMotionId } from '@/lib/video/cameraPresets'
 
 interface GenerateResponse {
   url:       string
   inputUrl:  string
-  credits?:  number   // saldo real pós-débito (quando o servidor informa)
+  credits?:  number   // saldo do plano, para compatibilidade
+  totalBalance?: number // saldo utilizável: plano e Nodes extras
   error?:    string
+  cameraMotion?: string
 }
 
 export function useVideoGeneration(
@@ -47,6 +51,7 @@ export function useVideoGeneration(
           sourceKey,
           engine:       state.modelId,
           duration:     state.duration,
+          resolution:   requireVideoModel(state.modelId).supportedResolutions[0],
           scene:        state.sceneType,
           intensity:    state.intensity,
           prompt:       state.userPrompt,
@@ -79,15 +84,17 @@ export function useVideoGeneration(
           aspectRatio:  state.aspectRatio,
           intensity:    state.intensity,
           videoType:    state.videoType,
-          motionId:     motion.id,
+          motionId:     data.cameraMotion && isCameraMotionId(data.cameraMotion) ? data.cameraMotion : motion.id,
           sceneType:    state.sceneType,
           nodesCharged: nodeCost,
           createdAt:    Date.now(),
         },
         // Prefere o saldo real informado pelo servidor; senão estima local.
-        newCredits: typeof data.credits === 'number'
-          ? data.credits
-          : Math.max(0, state.credits - nodeCost),
+        newCredits: typeof data.totalBalance === 'number'
+          ? data.totalBalance
+          : typeof data.credits === 'number'
+            ? data.credits
+            : Math.max(0, state.credits - nodeCost),
       })
     } catch (err) {
       console.error('[useVideoGeneration] falhou:', err)

@@ -96,6 +96,8 @@ export interface ChoiceGroupProps<T extends string> {
 export function ChoiceGroup<T extends string>({
   options, value, onChange, label, cols = 3,
 }: ChoiceGroupProps<T>) {
+  const focusValue = options.find(opt => opt.value === value && !opt.disabled)?.value
+    ?? options.find(opt => !opt.disabled)?.value
   return (
     <div className="spn-choices" data-cols={cols} role="radiogroup" aria-label={label}>
       {options.map(opt => (
@@ -106,7 +108,21 @@ export function ChoiceGroup<T extends string>({
           className="spn-choice"
           aria-checked={opt.value === value}
           disabled={opt.disabled}
+          tabIndex={opt.value === focusValue ? 0 : -1}
           onClick={() => onChange(opt.value)}
+          onKeyDown={event => {
+            if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+            event.preventDefault()
+            const enabled = options.filter(option => !option.disabled)
+            if (!enabled.length) return
+            const index = enabled.findIndex(option => option.value === opt.value)
+            const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? enabled.length - 1
+              : (index + (event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1) + enabled.length) % enabled.length
+            const buttons = Array.from(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(':scope > button') ?? [])
+              .filter(button => !button.disabled)
+            buttons[nextIndex]?.focus()
+            onChange(enabled[nextIndex].value)
+          }}
         >
           <b>{opt.title}</b>
           {opt.note ? <span>{opt.note}</span> : null}

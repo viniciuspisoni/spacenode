@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getPayerBalance } from '@/lib/workspaces/balance'
 import AnimateClient from './AnimateClient'
 import { assertSafeImageUrl } from '@/lib/edit-v3/ssrf'
+import { listConfiguredVideoModelIds } from '@/lib/video/adapters'
 
 export default async function VideoPage({ searchParams }: { searchParams: Promise<{ source?: string }> }) {
   const sp = await searchParams
@@ -18,5 +19,5 @@ export default async function VideoPage({ searchParams }: { searchParams: Promis
   if (sp.source) {
     try { assertSafeImageUrl(sp.source); source = sp.source } catch { /* Ignore invalid deep links. */ }
   }
-  return <AnimateClient initialCredits={balance.planBalance} initialSourceUrl={source} />
+  return <AnimateClient initialCredits={balance.totalBalance} initialSourceUrl={source} availableModelIds={listConfiguredVideoModelIds()} />
 }

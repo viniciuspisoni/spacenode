@@ -16,6 +16,8 @@ export const VIDEO_FLAGS = {
   enableGoogleFlow:        flag('NEXT_PUBLIC_ENABLE_GOOGLE_FLOW'),
   enableGeminiOmni:        flag('NEXT_PUBLIC_ENABLE_GEMINI_OMNI'),
   enableAutoVideoAnalysis: flag('NEXT_PUBLIC_ENABLE_AUTO_VIDEO_ANALYSIS'),
+  // Default OFF até validar as novas variantes com projetos reais.
+  enableNewVariants: process.env.NEXT_PUBLIC_ENABLE_VIDEO_VARIANTS === '1',
 } as const
 
 export type VideoFlags = typeof VIDEO_FLAGS

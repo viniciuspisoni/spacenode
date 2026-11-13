@@ -7,7 +7,7 @@
 // Quando o Vertex está ligado e configurado, ele assume o Veo; se o submit
 // falhar, o próprio adapter cai de volta pro fal. Catálogo/preço não mudam.
 
-import { requireVideoModel } from '../models'
+import { requireVideoModel, listAvailableVideoModels } from '../models'
 import { falAdapter }         from './falAdapter'
 import { googleFlowAdapter }  from './googleFlowAdapter'
 import { omniAdapter }        from './omniAdapter'
@@ -32,9 +32,18 @@ export function getAdapterForModel(modelId: string): VideoAdapter {
     case 'google': return googleFlowAdapter
     case 'omni':   return omniAdapter
     case 'vertex': return vertexVeoAdapter
+    case 'byteplus':
+    case 'luma': throw new Error(`Integração ${model.label} em preparação.`)
     default: {
       const _exhaustive: never = model.provider
       throw new Error(`Provider sem adapter: ${_exhaustive}`)
     }
   }
+}
+
+// Calculado apenas no servidor: a UI recebe IDs, nunca credenciais.
+export function listConfiguredVideoModelIds(): string[] {
+  // A rota usa fal.storage para receber as imagens de todos os providers.
+  if (!falAdapter.isAvailable()) return []
+  return listAvailableVideoModels().filter(model => getAdapterForModel(model.id).isAvailable()).map(model => model.id)
 }
