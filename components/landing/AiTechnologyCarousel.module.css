@@ -66,6 +66,15 @@
 .note { margin: 16px 0 0; text-align: center; color: var(--color-text-tertiary); font-size: 11px; line-height: 1.6; }
 .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
+@media (min-width: 1024px) {
+  .controls { display: none; }
+  .track { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; overflow: visible; scroll-snap-type: none; }
+  .card { min-width: 0; }
+  .logoSlot { width: 100%; max-width: 124px; }
+  .logo { max-width: min(108px, 100%); }
+  .logo[data-brand='openai'] { width: min(136px, 125%); height: auto; }
+}
+
 @media (max-width: 768px) {
   .section { padding: 8px 16px 64px; }
   .heading { margin-bottom: 26px; }
