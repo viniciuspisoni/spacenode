@@ -46,6 +46,7 @@ export const EDIT_ACTIONS: EditActionDef[] = [
 ]
 
 export interface EditPanelProps {
+  economicEditing?: boolean
   action: EditV4Action
   onAction: (a: EditV4Action) => void
   instruction: string
@@ -104,9 +105,10 @@ export function EditPanel(props: EditPanelProps) {
 
   const def = EDIT_ACTIONS.find(a => a.id === props.action) ?? EDIT_ACTIONS[0]
   const insufficient = props.balance !== null && props.nodes > props.balance
-  const blocked = def.requiresSelection && !props.hasSelection
+  const blocked = (props.economicEditing || def.requiresSelection) && !props.hasSelection
   const canExecute =
     !props.busy && !insufficient && !blocked && props.instruction.length <= 2000 &&
+    (!props.economicEditing || props.instruction.trim().length > 0) &&
     (props.hasSelection || props.instruction.trim().length > 0 || !!props.referenceUrl)
 
   return (
@@ -133,7 +135,7 @@ export function EditPanel(props: EditPanelProps) {
         {props.instruction.length > 2000 && <p role="alert" className="spn-hint">Seu pedido foi preservado. Resuma em até 2.000 caracteres no campo acima para continuar.</p>}
         {blocked && (
           <p style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)', marginTop: 8 }}>
-            {props.action === 'insert_element'
+            {props.economicEditing ? 'Marque a área completa que deseja ajustar e descreva a mudança.' : props.action === 'insert_element'
               ? 'Marque o lugar onde o elemento entra.'
               : 'Marque o objeto que será trocado.'}
           </p>
@@ -192,7 +194,7 @@ export function EditPanel(props: EditPanelProps) {
           )}
         </div>
 
-        {def.uniformizes && props.canGrow && (
+        {!props.economicEditing && def.uniformizes && props.canGrow && (
           <label
             style={{
               display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10, cursor: 'pointer',
@@ -218,7 +220,7 @@ export function EditPanel(props: EditPanelProps) {
           <Chip
             onClick={props.onGrow}
             disabled={!props.hasSelection || !props.canGrow}
-            title="Cresce o que você marcou até a superfície inteira, agora — o mesmo que a edição faz sozinha, para você conferir antes"
+            title={props.economicEditing ? 'Expande a seleção agora. Confira a área completa antes de confirmar; a edição não amplia sua seleção automaticamente.' : 'Cresce o que você marcou até a superfície inteira, agora — o mesmo que a edição faz sozinha, para você conferir antes'}
           >
             Expandir p/ o material
           </Chip>
@@ -274,7 +276,7 @@ export function EditPanel(props: EditPanelProps) {
 
       <Section title="Precisão" open={openPrecision} onToggle={() => setOpenPrecision(v => !v)}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Seg
+          {props.economicEditing ? <p className="spn-hint">Apenas a área confirmada será editada, com borda exata e preservação máxima fora dela.</p> : <Seg
             label="Preservação fora da área"
             options={[
               { id: 'maximum', label: 'Preserva o máximo' },
@@ -282,7 +284,7 @@ export function EditPanel(props: EditPanelProps) {
             ]}
             value={props.preservation}
             onChange={props.onPreservation}
-          />
+          />}
           <Seg
             label="Intensidade"
             options={[
@@ -293,7 +295,7 @@ export function EditPanel(props: EditPanelProps) {
             value={props.intensity}
             onChange={props.onIntensity}
           />
-          <Seg
+          {!props.economicEditing && <Seg
             label="Borda"
             options={[
               { id: 'hard', label: 'Exata' },
@@ -301,7 +303,7 @@ export function EditPanel(props: EditPanelProps) {
             ]}
             value={props.edge}
             onChange={props.onEdge}
-          />
+          />}
         </div>
       </Section>
 

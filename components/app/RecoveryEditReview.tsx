@@ -3,10 +3,10 @@
 import { Sheet } from './glass'
 import styles from './RenderRecovery.module.css'
 
-export default function RecoveryEditReview({ open, onClose, onConfirm, instruction, hasSelection, referenceUrl, nodes, busy, actionLabel, settings, selectionMayExpand = false }: {
+export default function RecoveryEditReview({ open, onClose, onConfirm, instruction, hasSelection, referenceUrl, nodes, busy, actionLabel, settings, selectionMayExpand = false, previewOnly = false }: {
   open: boolean; onClose: () => void; onConfirm: () => void
   instruction: string; hasSelection: boolean; referenceUrl: string | null; nodes: number | null; busy: boolean
-  actionLabel: string; settings?: string; selectionMayExpand?: boolean
+  actionLabel: string; settings?: string; selectionMayExpand?: boolean; previewOnly?: boolean
 }) {
   return <Sheet id="recovery-edit-review" open={open} title="Revisar ajuste" onClose={onClose} doneLabel="Voltar ao pedido">
     <div className={styles.review}>
@@ -20,8 +20,8 @@ export default function RecoveryEditReview({ open, onClose, onConfirm, instructi
         <img src={referenceUrl} alt="Amostra que será usada neste ajuste" />
       </div>}
       <strong>{nodes === null ? 'Consultando custo…' : `Custo desta edição: ${nodes} Nodes`}</strong>
-      <p>O pedido só será enviado ao confirmar abaixo.</p>
-      <button type="button" className="spn-cta" disabled={busy || nodes === null} onClick={onConfirm}>{busy ? 'Editando…' : nodes === null ? 'Aguarde o custo' : `Confirmar ajuste · ${nodes} Nodes`}</button>
+      <p>{previewOnly ? 'As edições com IA estão pausadas. Esta conferência não envia a edição nem consome Nodes.' : 'O pedido só será enviado ao confirmar abaixo.'}</p>
+      <button type="button" className="spn-cta" disabled={busy || nodes === null} onClick={onConfirm}>{busy ? 'Editando…' : nodes === null ? 'Aguarde o custo' : previewOnly ? 'Conferir pedido sem editar' : `Confirmar ajuste · ${nodes} Nodes`}</button>
     </div>
   </Sheet>
 }

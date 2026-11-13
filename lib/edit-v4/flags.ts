@@ -11,6 +11,11 @@ export function editV4Enabled(): boolean {
   return process.env.EDIT_V4_ENABLED === '1'
 }
 
+/** Pausa todos os motores antes de banco/Storage/IA. Ausente preserva o legado. */
+export function editV4PaidCallsEnabled(): boolean {
+  return process.env.EDIT_V4_PAID_CALLS !== '0'
+}
+
 /** Liga a página `/app/editar-v4` e o fork do `/app/editar`. */
 export function editV4UiEnabled(): boolean {
   return process.env.NEXT_PUBLIC_EDIT_V4 === '1'
@@ -56,9 +61,7 @@ export function editV4NormalizerEnabled(): boolean {
   return process.env.EDIT_V4_NORMALIZER !== '0'
 }
 
-/** Gate semântico pós-geração (visão compara original × resultado). Advisory
- *  quando há máscara (o recompose já garante os pixels), decisivo sem máscara.
- *  Mesma dependência do Gemini acima: indisponível → `skipped`, nunca bloqueia. */
+/** Verificação obrigatória. Desligada/indisponível impede entrega e cobrança. */
 export function editV4SemanticGateEnabled(): boolean {
   return process.env.EDIT_V4_SEMANTIC_GATE !== '0'
 }
