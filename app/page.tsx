@@ -16,6 +16,7 @@ import { PricingToggle } from '@/components/landing/PricingToggle'
 import { FAQ } from '@/components/landing/FAQ'
 import { MobileCTA } from '@/components/landing/MobileCTA'
 import { IdentityLaunchBanner } from '@/components/IdentityLaunchBanner'
+import { AiTechnologyCarousel } from '@/components/landing/AiTechnologyCarousel'
 
 export default function Home() {
   return (
@@ -37,6 +38,7 @@ export default function Home() {
       <Navbar />
       <LpViewPing slug="home-presentation-v1" />
       <Hero />
+      <AiTechnologyCarousel />
       <HowItWorks />
       <Projects />
       <Differentiators />

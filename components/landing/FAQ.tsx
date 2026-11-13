@@ -8,6 +8,14 @@ const faqLink = { color: 'var(--color-text-primary)', textDecoration: 'underline
 
 const faqs: { q: string; a: React.ReactNode }[] = [
   {
+    q: 'Preciso escolher qual inteligência artificial usar?',
+    a: 'Você pode começar com as configurações da SpaceNode. As tecnologias já estão integradas aos recursos de criação, edição, ampliação, vídeo e 3D. Você escolhe o que quer fazer, sem precisar contratar ou configurar cada serviço separadamente. Algumas ferramentas também oferecem ajustes opcionais de motor e qualidade para quem quiser explorar outras possibilidades.',
+  },
+  {
+    q: 'Quais tecnologias de IA estão na SpaceNode?',
+    a: 'A SpaceNode integra Google Gemini e Veo, OpenAI, Seedream da ByteDance via BytePlus, Kling e Topaz. Para criar blocos 3D, reúne Tripo, Hyper3D (Rodin) e Meshy. A ampliação também conta com Clarity como alternativa ao Topaz. Cada tecnologia participa de recursos específicos; elas não são usadas todas ao mesmo tempo em cada geração.',
+  },
+  {
     q: 'Preciso saber renderizar ou escrever comandos para a IA?',
     a: 'Você começa com um print do projeto e escolhe as opções de luz, estilo e materiais na plataforma. Não precisa escrever um comando para a IA nem configurar uma cena de render do zero. Use os créditos grátis para experimentar esse caminho no seu projeto.',
   },

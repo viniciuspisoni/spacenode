@@ -8,10 +8,10 @@ export default function Hero() {
     <section className="spn-hero" data-cta-position="hero">
       <div className="spn-hero-copy">
         <span className="spn-hero-badge spn-glass--raised">Para arquitetos e designers de interiores</span>
-        <h1 className="spn-hero-title">Seu projeto está pronto. Falta a imagem para apresentar.</h1>
+        <h1 className="spn-hero-title">Você cuida do projeto. A SpaceNode cuida da IA.</h1>
         <p className="spn-hero-sub">
-          Transforme um print do SketchUp em uma imagem para a apresentação ao cliente.
-          Compare com o original e teste no projeto em que você já está trabalhando.
+          Transforme um print do SketchUp em uma imagem para apresentar ao cliente.
+          Tecnologias de referência em um só lugar, com escolhas simplificadas pela SpaceNode.
         </p>
         <a href="/login?mode=signup&next=%2Fapp%2Fgenerate" className="spn-hero-primary">
           Testar no meu projeto grátis
