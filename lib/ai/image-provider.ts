@@ -222,6 +222,8 @@ export interface GenerateImageArgs {
   /** Identificação nos logs, ex.: 'generate', 'spaces.generate', 'retocar/nb2'. */
   context: string
   deliver: ImageDelivery
+  /** Do not spill to a higher-cost provider for cost-capped tools. */
+  allowFallback?: boolean
   /** Rótulo de PAPEL de cada imagem, paralelo a falInput.image_urls. No caminho
    *  GCP/Vertex cada rótulo vira uma parte de texto imediatamente ANTES da
    *  imagem correspondente — é o que vincula "Image #1"/"Image #2" do prompt à
@@ -893,7 +895,7 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
   // corrida GCP × FAL abaixo (ark falha antes do hedge → FAL na hora; depois →
   // espera a FAL em voo; os dois falham → sobe o erro traduzível).
   if (arkAvailableFor(args.falEndpoint)) {
-    const fallback = imageFallbackEnabled()
+    const fallback = imageFallbackEnabled() && args.allowFallback !== false
     // 180 s (era 150): sem hedge não se reserva mais tempo pra uma perna
     // paralela da FAL, então a ark pode usar quase todo o orçamento. A cauda
     // medida em prod é 134–145 s — a 150 s os lentos morriam a segundos do fim

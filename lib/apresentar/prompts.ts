@@ -17,7 +17,8 @@ import type {
 
 // ── Planta Humanizada ────────────────────────────────────────────────────────
 
-const PROJECT_TYPE_HINT: Record<HumanizedPlanProjectType, string> = {
+const PROJECT_TYPE_HINT: Record<HumanizedPlanProjectType | 'auto', string> = {
+  auto: 'architectural floor plan',
   apartamento:  'residential apartment floor plan',
   casa:         'single-family house floor plan',
   comercial:    'commercial retail floor plan',
@@ -57,7 +58,7 @@ const OPTION_FRAGMENTS: { key: keyof HumanizedPlanOptions; on: string; off?: str
 ]
 
 export interface HumanizedPlanPromptInput {
-  projectType: HumanizedPlanProjectType
+  projectType: HumanizedPlanProjectType | 'auto'
   style:       HumanizedPlanStyle
   level:       HumanizedPlanLevel
   options:     HumanizedPlanOptions
@@ -129,6 +130,7 @@ export function buildHumanizedPlanPrompt(
     `LEVEL: ${LEVEL_DIRECTIVE[level]}`,
     '',
     optionLines ? `OPTIONS:\n${optionLines}` : 'OPTIONS: minimal additions only.',
+    ...(!options.addRoomLabels ? ['TEXT: Do not draw any room names, legends, letterforms, captions or labels. Typography is applied after generation.'] : []),
     ...(additionalInstructions?.trim()
       ? ['', `ADDITIONAL USER INSTRUCTIONS (complement the settings above, do not override structural fidelity):\n${additionalInstructions.trim()}`]
       : []),
