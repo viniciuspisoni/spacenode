@@ -18,7 +18,7 @@ const TECHNOLOGIES = [
     models: 'GPT Image',
     logo: '/brand/ai/openai-white.png',
     category: 'Criação de imagens',
-    description: 'A tecnologia de imagem da OpenAI está integrada ao motor Orion para gerar novas visualizações a partir do seu projeto.',
+    description: 'A tecnologia de imagem da OpenAI ajuda a gerar novas visualizações a partir do seu projeto, dentro da SpaceNode.',
   },
   {
     id: 'byteplus',
@@ -26,7 +26,7 @@ const TECHNOLOGIES = [
     models: 'Seedream · ByteDance',
     logo: '/brand/ai/byteplus.svg',
     category: 'Criação e edição de imagens',
-    description: 'Seedream, da ByteDance, participa da renderização com o motor Quasar e da edição de imagens. Sua integração reúne esses recursos dentro do fluxo da SpaceNode.',
+    description: 'Seedream, da ByteDance, participa da criação e edição de imagens para explorar novas possibilidades a partir do seu projeto.',
   },
   {
     id: 'kling',
@@ -58,7 +58,7 @@ const TECHNOLOGIES = [
     models: 'Rodin',
     logo: '/brand/ai/hyper3d.png',
     category: 'Criação de blocos 3D',
-    description: 'Rodin, da Hyper3D, participa da criação de blocos tridimensionais a partir de referências, na opção de alta qualidade do Blocos 3D.',
+    description: 'Rodin, da Hyper3D, cria blocos tridimensionais a partir de referências para compor seus projetos.',
   },
   {
     id: 'meshy',
@@ -66,7 +66,7 @@ const TECHNOLOGIES = [
     models: 'Meshy 3D',
     logo: '/brand/ai/meshy.svg',
     category: 'Criação de blocos 3D',
-    description: 'Meshy está integrado à opção Premium do Blocos 3D, com geração a partir de imagens e formatos de arquivo para continuar o trabalho em outras ferramentas.',
+    description: 'Meshy transforma imagens em modelos 3D, com formatos de arquivo para continuar o trabalho em outras ferramentas.',
   },
 ] as const
 
