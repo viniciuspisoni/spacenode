@@ -61,7 +61,7 @@ const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
     // extras" porque os dois falam da mesma coisa: o que acontece com o
     // saldo. A frase inteira da política está no bloco sob o subtítulo.
     features: [
-      { label: 'Acesso a todos os motores' },
+      { label: 'Tecnologias de IA integradas' },
       { label: 'Nodes não utilizados acumulam' },
       { label: 'Nodes extras disponíveis' },
       { label: 'Suporte por e-mail' },
@@ -92,8 +92,8 @@ const PLAN_DISPLAY: Record<SellablePlanId, PlanDisplay> = {
   },
 }
 
-// Check neutro, não verde: o item da lista é FATO ("acesso a todos os
-// motores"), não estado de sucesso. Em terciário ele fica atrás do rótulo,
+// Check neutro, não verde: o item da lista é FATO ("Tecnologias de IA
+// integradas"), não estado de sucesso. Em terciário ele fica atrás do rótulo,
 // que é quem carrega a informação.
 const CheckIcon = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden>

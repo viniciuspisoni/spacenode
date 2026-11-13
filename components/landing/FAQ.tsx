@@ -9,7 +9,7 @@ const faqLink = { color: 'var(--color-text-primary)', textDecoration: 'underline
 const faqs: { q: string; a: React.ReactNode }[] = [
   {
     q: 'Preciso escolher qual inteligência artificial usar?',
-    a: 'Você pode começar com as configurações da SpaceNode. As tecnologias já estão integradas aos recursos de criação, edição, ampliação, vídeo e 3D. Você escolhe o que quer fazer, sem precisar contratar ou configurar cada serviço separadamente. Algumas ferramentas também oferecem ajustes opcionais de motor e qualidade para quem quiser explorar outras possibilidades.',
+    a: 'Você pode começar com as configurações da SpaceNode. As tecnologias já estão integradas aos recursos de criação, edição, ampliação, vídeo e 3D. Você escolhe o que quer fazer, sem precisar contratar ou configurar cada serviço separadamente.',
   },
   {
     q: 'Quais tecnologias de IA estão na SpaceNode?',
@@ -21,7 +21,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'Posso testar sem cartão? O teste vira uma assinatura?',
-    a: 'O cadastro oferece 80 Nodes grátis, sem pedir cartão. Eles são créditos de uso; a quantidade de imagens depende do motor, da resolução e das ações que você escolher. O teste não vira uma assinatura automaticamente. Para continuar com um plano mensal, você escolhe e confirma a compra.',
+    a: 'O cadastro oferece 80 Nodes grátis, sem pedir cartão. Eles são créditos de uso; a quantidade de imagens depende da resolução e dos recursos utilizados. O teste não vira uma assinatura automaticamente. Para continuar com um plano mensal, você escolhe e confirma a compra.',
   },
   {
     q: 'Como confiro se a imagem respeitou meu projeto?',
@@ -33,7 +33,7 @@ const faqs: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'O que são Nodes?',
-    a: `São os créditos de uso. Cada geração, edição ou ampliação consome nodes conforme o motor e a resolução — um render HD parte de 10 nodes; 2K, de 15; 4K, de 25. ${NODES_ROLLOVER_COPY_LANDING} O que sobrar de um mês soma com os nodes do mês seguinte. Os Nodes extras, comprados avulsos, não expiram — e o consumo usa primeiro os mensais.`,
+    a: `São os créditos de uso. Cada geração, edição ou ampliação consome nodes conforme o recurso e a resolução — um render HD parte de 10 nodes; 2K, de 15; 4K, de 25. ${NODES_ROLLOVER_COPY_LANDING} O que sobrar de um mês soma com os nodes do mês seguinte. Os Nodes extras, comprados avulsos, não expiram — e o consumo usa primeiro os mensais.`,
   },
   {
     q: 'Consigo usar as imagens com clientes?',
