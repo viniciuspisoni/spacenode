@@ -1,7 +1,8 @@
 'use client'
 
 import { BeforeAfter } from '@/components/landing/BeforeAfter'
-import { SELLABLE_PLANS } from '@/lib/plans'
+import { ANNUAL_BILLING_ENABLED, SELLABLE_PLANS } from '@/lib/plans'
+import { formatBRL } from '@/lib/launch-offer'
 
 export default function Hero() {
   return (
@@ -18,7 +19,10 @@ export default function Hero() {
           <span aria-hidden="true">→</span>
         </a>
         <p className="spn-hero-note">80 Nodes grátis · sem cartão · em português</p>
-        <p className="spn-hero-price">Para continuar: planos a partir de R$ {SELLABLE_PLANS[0].monthlyPrice}/mês.</p>
+        <p className="spn-hero-price">
+          Para continuar: planos a partir de R$ {formatBRL(ANNUAL_BILLING_ENABLED ? SELLABLE_PLANS[0].annualMonthlyPrice : SELLABLE_PLANS[0].monthlyPrice)}/mês{ANNUAL_BILLING_ENABLED ? ' no plano anual.' : '.'}
+          {ANNUAL_BILLING_ENABLED && <> R$ {formatBRL(SELLABLE_PLANS[0].annualTotal)} cobrados anualmente.</>}
+        </p>
       </div>
       <figure className="spn-hero-proof">
         <div className="spn-hero-frame spn-glass">
