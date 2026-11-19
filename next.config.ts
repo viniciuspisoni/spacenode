@@ -6,7 +6,17 @@ import path from "path";
 // exigiria nonce/hash e poderia quebrar; frame-ancestors + nosniff + HSTS já
 // fecham clickjacking e SSL-strip. SAMEORIGIN (não DENY) preserva qualquer
 // preview/iframe same-origin. HSTS sem `preload` (compromisso irreversível).
+//
+// Auditoria 2026-11-18: CSP BASE, sem script-src/style-src (não toca no script
+// inline nem em pixels/GIS/Stripe). Só fecha o que nenhuma página usa:
+// <object>/<embed> (object-src) e sequestro de URLs relativas via <base>
+// (base-uri). frame-ancestors espelha o X-Frame-Options para browsers que
+// priorizam a CSP. A CSP com nonce continua como próximo passo (exige render
+// dinâmico — ver node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md).
+const BASE_CSP = "object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+
 const SECURITY_HEADERS = [
+  { key: 'Content-Security-Policy',   value: BASE_CSP },
   { key: 'X-Frame-Options',           value: 'SAMEORIGIN' },
   { key: 'X-Content-Type-Options',    value: 'nosniff' },
   { key: 'Referrer-Policy',           value: 'strict-origin-when-cross-origin' },

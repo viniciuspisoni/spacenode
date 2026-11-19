@@ -39,8 +39,13 @@ export default async function PublicPackPage({
     notFound()
   }
 
+  // `space_id` e `vistas_ordered` são gravados pelo dono do pack (policy
+  // packs_update_own) e esta página lê com service-role: sem o filtro por
+  // user_id, um pack poderia apontar para Space/Vistas de OUTRA conta e
+  // publicá-los no link (IDOR, auditoria 2026-11-18 S3). Tudo que aparece aqui
+  // tem que ser do dono do pack.
   const [spaceRes, identityRes] = await Promise.all([
-    admin.from('spaces').select('*').eq('id', pack.space_id).single(),
+    admin.from('spaces').select('*').eq('id', pack.space_id).eq('user_id', pack.user_id).maybeSingle(),
     admin.from('architect_identity').select('*').eq('user_id', pack.user_id).maybeSingle(),
   ])
   if (!spaceRes.data) notFound()
@@ -57,6 +62,7 @@ export default async function PublicPackPage({
     const { data: vistasRows } = await admin
       .from('vistas')
       .select('*')
+      .eq('user_id', pack.user_id)
       .in('id', orderedIds)
     const map = new Map((vistasRows ?? []).map(v => [v.id, v as Vista]))
     vistas = orderedIds.map(id => map.get(id)).filter(Boolean) as Vista[]

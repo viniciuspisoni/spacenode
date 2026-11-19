@@ -34,7 +34,14 @@ export async function GET(req: NextRequest) {
 
   // Ownership: a chave tem que estar no namespace do próprio usuário. Impede
   // ler arquivo de outro usuário via /api/media, mesmo com o bucket privado.
-  if (!key.startsWith(`${user.id}/`)) {
+  // Segmentos '.'/'..', barra dupla, barra invertida e controles são recusados:
+  // `${user.id}/../<outro-id>/x` passaria no prefixo (auditoria 2026-11-18).
+  const segments = key.split('/')
+  if (
+    !key.startsWith(`${user.id}/`) ||
+    segments.some(s => s === '' || s === '.' || s === '..') ||
+    /[\\\u0000-\u001f\u007f]/.test(key)
+  ) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
   }
 

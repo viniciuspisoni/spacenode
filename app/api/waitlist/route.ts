@@ -3,9 +3,16 @@ import { NextResponse } from 'next/server'
 import { rateLimit, clientIp } from '@/lib/rate-limit'
 
 export async function POST(req: Request) {
-  const { email } = await req.json()
+  // JSON inválido era exceção → 500; e-mail sem teto de tamanho ia direto pro
+  // banco. Rota pública: valida formato e limita a 254 chars (RFC 5321).
+  const body = await req.json().catch(() => null) as { email?: unknown } | null
+  const email = body?.email
 
-  if (!email || typeof email !== 'string' || !email.includes('@')) {
+  if (
+    typeof email !== 'string' ||
+    email.length > 254 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  ) {
     return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
   }
 
