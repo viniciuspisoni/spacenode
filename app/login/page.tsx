@@ -7,6 +7,7 @@ import { useTheme } from '@/lib/theme/ThemeProvider'
 import { Brandmark } from '@/components/brand'
 import { internalNextPath } from '@/lib/auth/safe-next-path'
 import { LOGIN_NEXT_COOKIE, LOGIN_NEXT_MAX_AGE } from '@/lib/auth/login-next-cookie'
+import { weakPasswordMessage } from '@/lib/auth/password-errors'
 import {
   ANON_COOKIE,
   intentFromSearchParams,
@@ -281,7 +282,9 @@ function LoginForm() {
         },
       })
       if (error) {
-        setError(translateError(error.message))
+        // Senha vazada/fraca recusada pelo Supabase vem com motivo próprio —
+        // a mensagem genérica fazia a pessoa repetir a mesma senha.
+        setError(weakPasswordMessage(error) ?? translateError(error.message))
         setLoading(false)
       } else if (data.session) {
         // Sessão na hora = confirmação de e-mail desligada: o cadastro acabou

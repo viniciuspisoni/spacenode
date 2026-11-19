@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { weakPasswordMessage } from '@/lib/auth/password-errors'
 import { Brandmark } from '@/components/brand'
 
 // Tela única usada nos dois cenários:
@@ -56,7 +57,7 @@ export default function UpdatePasswordPage() {
     const { error } = await supabase.auth.updateUser({ password })
 
     if (error) {
-      setError('Não foi possível atualizar a senha. Tente novamente.')
+      setError(weakPasswordMessage(error) ?? 'Não foi possível atualizar a senha. Tente novamente.')
       setLoading(false)
       return
     }
