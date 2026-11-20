@@ -29,6 +29,7 @@ interface Props {
   atmosphere:      string
   avoidPeople:     boolean
   endImagePreview: string | null
+  supportsEndFrame?: boolean
   onUserPrompt:    (v: string) => void
   onFidelity:      (v: FidelityMode) => void
   onScene:         (v: SceneTypeId) => void
@@ -41,10 +42,10 @@ interface Props {
 export default function DirectionSheet({
   open, onClose, userPrompt, suggestion, fidelityMode, sceneType, atmosphere,
   avoidPeople, endImagePreview, onUserPrompt, onFidelity, onScene, onAtmosphere,
-  onAvoidPeople, onEndImage, disabled,
+  onAvoidPeople, onEndImage, supportsEndFrame = false, disabled,
 }: Props) {
   return (
-    <Sheet open={open} title="Direção" onClose={onClose}>
+    <Sheet open={open} title="Direção e ajustes" onClose={onClose}>
       <div className="spn-field">
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -69,7 +70,7 @@ export default function DirectionSheet({
           onChange={e => onUserPrompt(e.target.value)}
           disabled={disabled}
           rows={3}
-          placeholder="Ex: câmera entrando lentamente na sala, preservando materiais e mobiliário."
+          placeholder="Ex.: valorizar a luz e os materiais, com movimento suave."
         />
         <p className="spn-hint">
           Complementa as diretivas de preservação — nunca as substitui.
@@ -132,7 +133,7 @@ export default function DirectionSheet({
         <p className="spn-hint">Reforça que a cena permaneça sem figuras humanas.</p>
       </div>
 
-      <div className="spn-field">
+      {supportsEndFrame && <div className="spn-field">
         <span className="spn-field-label">Frame final (opcional)</span>
         <ReferenceFrameUploader
           hint="Arraste ou clique para dirigir o final do vídeo"
@@ -142,7 +143,7 @@ export default function DirectionSheet({
           disabled={disabled}
           compact
         />
-      </div>
+      </div>}
     </Sheet>
   )
 }

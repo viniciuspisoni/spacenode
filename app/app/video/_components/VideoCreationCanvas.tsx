@@ -147,7 +147,7 @@ export default function VideoCreationCanvas({
             strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
             <path d="M3 8.5 L6.5 12 L13 4.5"/>
           </svg>
-          Composição, materiais e mobiliário serão preservados no vídeo.
+          A direção prioriza a composição, os materiais e o mobiliário do projeto.
         </div>
 
         {state.analysis?.fidelityNotes?.length ? (

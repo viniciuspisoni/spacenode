@@ -55,8 +55,8 @@ export const INTENSITY_LABELS: Record<CameraIntensity, string> = {
 export const INTENSITY_HINTS: Record<CameraIntensity, string> = {
   subtle:     'Movimento quase imperceptível — o mais seguro para preservar o projeto.',
   normal:     'Movimento presente, ainda contido e elegante.',
-  cinematic:  'Ritmo de cinema, com profundidade e presença.',
-  pronounced: 'Mais energia — indicado para redes sociais.',
+  cinematic:  'Movimento contido com ritmo constante e composição estável.',
+  pronounced: 'Deslocamento um pouco maior, ainda limitado à vista do projeto.',
 }
 
 // ── Fidelidade ───────────────────────────────────────────────────────────────
@@ -65,13 +65,13 @@ export const FIDELITY_ORDER: FidelityMode[] = ['max', 'balanced', 'creative']
 export const FIDELITY_LABELS: Record<FidelityMode, string> = {
   max:      'Máxima fidelidade',
   balanced: 'Equilíbrio',
-  creative: 'Mais liberdade',
+  creative: 'Atmosfera criativa',
 }
 
 export const FIDELITY_NOTES: Record<FidelityMode, string> = {
   max:      'Geometria, materiais e mobiliário',
   balanced: 'Adapta luz e atmosfera',
-  creative: 'Reinterpreta, mantendo a intenção',
+  creative: 'Atmosfera escolhida, projeto preservado',
 }
 
 // ── Atmosfera ────────────────────────────────────────────────────────────────
