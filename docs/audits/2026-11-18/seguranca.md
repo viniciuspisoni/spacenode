@@ -43,6 +43,8 @@ Reversão de emergência no cabeçalho da migration.
 5. `is_workspace_member(p_workspace, p_user)` permite a um usuário consultar a participação de outro (exige UUIDs) — trocar `p_user` por `auth.uid()` na próxima mexida em workspaces.
 6. CSP com nonce (`script-src`) — exige render dinâmico; avaliar custo de performance antes.
 7. Regra para novas colunas: coluna de `profiles`/`vistas` editável pelo browser precisa de `GRANT UPDATE (coluna)` na própria migration; o teste `security-column-lockdown` falha se um client component gravar coluna sem grant.
+8. Extensão `fuzzystrmatch` no schema `public` (advisor 0014): `levenshtein`, `soundex` etc. ficavam expostas como `/rest/v1/rpc/…` para qualquer pessoa.
+   - **Corrigido em 2026-11-20** (`20261120140000_fuzzystrmatch_to_extensions.sql`): extensão movida para o schema `extensions`, que a API não expõe. Nada no banco nem no app dependia dela; consultas no console seguem funcionando sem prefixo (o search_path do `postgres` inclui `extensions`).
 
 ## Conferido e sem achado
 
