@@ -3,6 +3,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { editV4Enabled } from '@/lib/edit-v4/flags'
+import { editV4ExecutionAvailable } from '@/lib/edit-v4/availability'
+import { economicEnabled, ECONOMIC_NODES } from '@/lib/edit-v4/economic/policy'
+import { nodesForEdit } from '@/lib/edit-v4/pricing'
+import { editV4Route } from '@/lib/edit-v4/flags'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { FinalizeEditor } from '@/components/finalizar/FinalizeEditor'
@@ -18,6 +22,7 @@ export default async function FinalizarPage({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+  const economicEditing = economicEnabled(user.id)
 
   const { data } = await supabase
     .from('finalize_projects')
@@ -39,6 +44,8 @@ export default async function FinalizarPage({
         savedProjects={savedProjects}
         initialSourceUrl={sp.source ?? null}
         aiEnabled={editV4Enabled()}
+        aiExecutionAvailable={editV4ExecutionAvailable(user.id)}
+        economicEditing={economicEditing} nodesPerEdit={economicEditing ? ECONOMIC_NODES : nodesForEdit({ provider: editV4Route() })}
       />
     </div>
   )
