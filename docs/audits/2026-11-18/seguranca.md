@@ -37,6 +37,7 @@ Reversão de emergência no cabeçalho da migration.
 1. **Checar se o S1 foi explorado** — comparar `profiles.credits` com o que o `node_ledger`/Stripe explicam e procurar `plan` pago sem `stripe_subscription_id`. Exige ler dados de produção.
 2. **Leaked password protection** desligada no Supabase Auth (advisor) — ligar no painel.
 3. Bucket `architect-identity` é público e aceita `image/svg+xml`: SVG com script roda no domínio `*.supabase.co` se aberto direto (sem sessão nossa lá, mas serve para phishing). Rasterizar SVG no upload ou recusá-lo; concluir o flip B2 dos buckets públicos (`space-mestres`, `architect-identity`).
+   - **Corrigido em 2026-11-20** (`20261120120000_architect_identity_no_svg.sql` + `lib/spaces/logo-upload.ts`): SVG recusado (bucket e rota; a rota confere o tipo pelos bytes) e saem as policies de escrita do `authenticated` no bucket — só a rota grava. Produção tinha 3 logos, todos PNG. O bucket segue público de propósito: o logo aparece na página pública do pack. O flip B2 de `space-mestres` continua pendente.
 4. `walkthrough_shares_public_read` (`using true`) deixa anônimos listarem todos os slugs de compartilhamento do Animar v2 legado — remover se o recurso não estiver em uso.
 5. `is_workspace_member(p_workspace, p_user)` permite a um usuário consultar a participação de outro (exige UUIDs) — trocar `p_user` por `auth.uid()` na próxima mexida em workspaces.
 6. CSP com nonce (`script-src`) — exige render dinâmico; avaliar custo de performance antes.

@@ -16,9 +16,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { signStorageUrl } from '@/lib/storage/signed'
-
-const ALLOWED_LOGO_MIME = ['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp']
-const MAX_LOGO_BYTES    = 2 * 1024 * 1024
+import { LOGO_FORMATS_LABEL, LOGO_MAX_BYTES, detectLogoType, logoExtension } from '@/lib/spaces/logo-upload'
 
 export async function GET() {
   const supabase = await createClient()
@@ -79,18 +77,23 @@ export async function PUT(req: NextRequest) {
   if (removeLogo) {
     update.logo_url = null
   } else if (logo instanceof File && logo.size > 0) {
-    if (!ALLOWED_LOGO_MIME.includes(logo.type)) {
-      return NextResponse.json({ error: 'Formato de logo não suportado' }, { status: 400 })
-    }
-    if (logo.size > MAX_LOGO_BYTES) {
+    if (logo.size > LOGO_MAX_BYTES) {
       return NextResponse.json({ error: 'Logo maior que 2 MB' }, { status: 400 })
     }
-    const ext = logo.type.split('/')[1].replace('jpeg', 'jpg').replace('svg+xml', 'svg')
-    const key = `${user.id}/logo-${Date.now()}.${ext}`
+    // Tipo pelos bytes, não pelo `type` do navegador: SVG (roda script no
+    // bucket público) ou qualquer coisa renomeada para .png é recusada.
     const buffer = Buffer.from(await logo.arrayBuffer())
+    const type = detectLogoType(buffer)
+    if (!type) {
+      return NextResponse.json(
+        { error: `Formato de logo não suportado. Envie ${LOGO_FORMATS_LABEL}.` },
+        { status: 400 },
+      )
+    }
+    const key = `${user.id}/logo-${Date.now()}.${logoExtension(type)}`
     const { error: upErr } = await admin.storage
       .from('architect-identity')
-      .upload(key, buffer, { contentType: logo.type, upsert: true })
+      .upload(key, buffer, { contentType: type, upsert: true })
     if (upErr) {
       console.error('[identity.put] upload failed:', upErr)
       return NextResponse.json({ error: 'Erro ao salvar logo' }, { status: 500 })

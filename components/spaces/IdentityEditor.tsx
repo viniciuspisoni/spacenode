@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { ArchitectIdentity, AccentColorMode } from '@/lib/spaces/types'
 import type { PlanId } from '@/lib/plans'
+import { LOGO_FORMATS_LABEL, LOGO_MAX_BYTES, LOGO_MIME_TYPES } from '@/lib/spaces/logo-upload'
 
 const ACCENT_PRESETS = ['#BDC2C8', '#2A4877', '#A33D3D', '#BA7517', '#5B5B5B', '#C2865B', '#1D9E75']
 
@@ -47,11 +48,11 @@ export function IdentityEditor({ initialIdentity, planName, whiteLabelAllowed }:
 
   function pickFile(f: File | null) {
     if (!f) return
-    if (!['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'].includes(f.type)) {
-      setError('Formato não suportado (JPG, PNG, SVG ou WebP)')
+    if (!(LOGO_MIME_TYPES as readonly string[]).includes(f.type)) {
+      setError(`Formato não suportado. Envie ${LOGO_FORMATS_LABEL}.`)
       return
     }
-    if (f.size > 2 * 1024 * 1024) {
+    if (f.size > LOGO_MAX_BYTES) {
       setError('Logo maior que 2 MB')
       return
     }
@@ -180,11 +181,11 @@ export function IdentityEditor({ initialIdentity, planName, whiteLabelAllowed }:
         gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
       }}>
         {/* Logo */}
-        <Field label="Logo" hint="PNG, SVG, JPG ou WebP — até 2 MB">
+        <Field label="Logo" hint={`${LOGO_FORMATS_LABEL} — até 2 MB`}>
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/svg+xml,image/webp"
+            accept={LOGO_MIME_TYPES.join(',')}
             onChange={e => pickFile(e.target.files?.[0] ?? null)}
             style={{ display: 'none' }}
           />
