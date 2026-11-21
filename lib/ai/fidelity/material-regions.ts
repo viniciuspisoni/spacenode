@@ -1,4 +1,4 @@
-import sharp from 'sharp'
+import sharp, { type OverlayOptions } from 'sharp'
 import { normalizeMaterialInventory, type MaterialObservation } from '@/lib/ai/material-inventory'
 
 const SOURCE_GRID: { surface: string; region: NonNullable<MaterialObservation['region']> }[] = [
@@ -36,7 +36,7 @@ export async function buildMaterialRegionSheet(original: Buffer, raw: unknown, o
   const normalized = await sharp(original).rotate().png().toBuffer()
   const meta = await sharp(normalized).metadata()
   if (!meta.width || !meta.height) return null
-  const layers: sharp.OverlayOptions[] = []
+  const layers: OverlayOptions[] = []
   const surfaces: string[] = []
   for (const entry of entries) {
     // Count usable crops, not boxes that collapse to a single pixel.
