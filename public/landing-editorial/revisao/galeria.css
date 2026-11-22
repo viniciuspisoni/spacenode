@@ -1,0 +1,39 @@
+:root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #20221f; background: #f8f8f5; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+main { max-width: 1260px; margin: 0 auto; padding: 30px clamp(14px, 4vw, 60px) 60px; }
+header { margin-bottom: 22px; }
+.brand { font-weight: 650; letter-spacing: -.05em; font-size: 18px; }
+h1 { font-weight: 540; font-size: clamp(31px, 4.5vw, 60px); line-height: 1; letter-spacing: -.051em; margin: 32px 0 12px; }
+p { color: #50554e; line-height: 1.45; margin: 0; }
+button,textarea { font: inherit; }
+button { cursor: pointer; min-height: 44px; padding: 8px 12px; border-radius: 5px; border: 1px solid #bfc3bb; background: transparent; color: #232621; }
+button:focus-visible, textarea:focus-visible { outline: 3px solid #47685c; outline-offset: 2px; }
+button[aria-pressed=true], #copy:not(:disabled) { background: #273129; border-color: #273129; color: white; }
+button:disabled { color: #686c64; cursor: default; }
+.toolbar { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 10px 0; border-block: 1px solid #d7dad3; margin-bottom: 18px; }
+.toolbar div { display: flex; gap: 4px; }
+#notice:not(:empty), #copy-text { margin: 0 0 16px; }
+#copy-text { width: 100%; padding: 10px; }
+#grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 26px 16px; }
+article { min-width: 0; }
+.open { aspect-ratio: 4/3; width: 100%; display: block; padding: 0; border: none; background: #e7e8e2; border-radius: 3px; overflow: hidden; }
+.open img { width: 100%; height: 100%; object-fit: contain; display: block; }
+h2 { font-size: 16px; font-weight: 560; margin: 10px 0 5px; line-height: 1.25; letter-spacing: -.018em; }
+.meta, .caption, .navigation { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+time, .caption p { color: #555a52; font-size: 14px; }
+dialog { width: min(100%,1060px); max-width: 100%; max-height: 96dvh; overflow-y: auto; padding: 0; border: none; border-radius: 5px; background: #f8f8f5; color: inherit; }
+dialog::backdrop { background: #151a17da; }
+.viewer { padding: 13px; }
+#close { display: block; margin: 0 0 9px auto; }
+#large { display: block; width: 100%; height: min(63dvh,690px); object-fit: contain; background: #e7e8e2; }
+.caption { padding-block: 5px 12px; }
+.navigation { border-top: 1px solid #d7dad3; padding-top: 9px; }
+@media (max-width: 720px) {
+  #grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 10px; }
+  h2 { font-size: 14px; }
+  .toolbar button,.meta button { font-size: 14px; padding-inline: 8px; }
+  time { font-size: 12px; }
+  dialog { width: calc(100% - 12px); }
+}

@@ -30,6 +30,7 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   outputFileTracingIncludes: {
     '/review-assets/*': ['./marketing/landing-review/*.webp'],
+    '/previa/imagens-recentes/dados': ['./marketing/landing-review/curadoria-20261122/imagens.bin'],
   },
   experimental: {
     // Com proxy.ts presente, o Next bufferiza o body e TRUNCA em 10MB por
