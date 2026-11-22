@@ -37,6 +37,7 @@
 .content { padding: clamp(12px, 2vw, 24px); }
 .intro, .selection p, .card p, .notice { margin: 0; line-height: 1.45; }
 .intro { color: #4d524a; font-size: 15px; }
+.studyNote { margin: 0 0 16px; color: #4d524a; font-size: 14px; line-height: 1.45; }
 
 .filters, .actions, .choices, .selection {
   display: flex;

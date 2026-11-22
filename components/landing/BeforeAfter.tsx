@@ -18,6 +18,7 @@ type Src = string | StaticImageData
 export function BeforeAfter({
   base,
   render,
+  renderAlt = 'Resultado SpaceNode — render fotorrealista',
   size = 'sm',
   aspect,
   priority = false,
@@ -26,6 +27,7 @@ export function BeforeAfter({
 }: {
   base: Src
   render: Src
+  renderAlt?: string
   size?: 'sm' | 'lg'
   /** Sobrescreve a proporção da moldura (padrão 4/3, ou 16/10 no `lg`). */
   aspect?: string
@@ -83,7 +85,7 @@ export function BeforeAfter({
       <Image
         src={render}
         unoptimized={typeof render === 'string' && render.startsWith('/review-assets/')}
-        alt="Resultado SpaceNode — render fotorrealista"
+        alt={renderAlt}
         fill
         draggable={false}
         sizes={sizes}

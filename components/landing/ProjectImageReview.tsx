@@ -2,11 +2,13 @@
 
 import Image from 'next/image'
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { exteriorProjects, interiorProjects, originalProjects, projectById, projectImages, type LandingProject } from './projectImageCatalog'
+import { exteriorProjects, interiorProjects, modelStudies, originalProjects, projectById, projectImages, userProjects, type LandingProject } from './projectImageCatalog'
 import { CoverComparison } from './CoverComparison'
 import styles from './ProjectImageReview.module.css'
 
 const groups = {
+  models: { label: 'Modelos 3D de 21/11', projects: modelStudies },
+  users: { label: 'Projetos de usuários', projects: userProjects },
   exterior: { label: 'Fachadas e externas', projects: exteriorProjects },
   interior: { label: 'Interiores', projects: interiorProjects },
   original: { label: 'Galeria original', projects: originalProjects },
@@ -72,7 +74,7 @@ export function ProjectImageReview({ renderGallery }: { renderGallery: (projects
   const stored = useSyncExternalStore(subscribe, readSaved, () => '')
   const applied = readIds(stored)
   const [draft, setDraft] = useState<string[] | null>(null)
-  const [group, setGroup] = useState<keyof typeof groups>('exterior')
+  const [group, setGroup] = useState<keyof typeof groups>(modelStudies.length ? 'models' : 'exterior')
   const [notice, setNotice] = useState('')
   const [manualCopy, setManualCopy] = useState('')
   const panel = useRef<HTMLDetailsElement>(null)
@@ -156,12 +158,13 @@ export function ProjectImageReview({ renderGallery }: { renderGallery: (projects
           <p className={styles.intro}>Escolha a foto que abre a página e marque as outras imagens da galeria. Suas escolhas ficam neste navegador.</p>
           <CoverComparison cover={cover} chooseCover={chooseCover} />
           <div role="group" aria-label="Conjunto de imagens" className={styles.filters}>
-            {(['exterior', 'interior', 'original'] as const).map(key => (
+            {(['models', 'users', 'exterior', 'interior', 'original'] as const).filter(key => groups[key].projects.length > 0).map(key => (
               <button key={key} type="button" aria-pressed={group === key} onClick={() => setGroup(key)}>
                 {groups[key].label} ({groups[key].projects.length})
               </button>
             ))}
           </div>
+          {group === 'models' && <p className={styles.studyNote}>Estudos de capa feitos com renderização 3D convencional a partir dos modelos baixados em 21/11.</p>}
           <div className={styles.grid}>
             {candidates.map(project => {
               const { render } = projectImages(project)

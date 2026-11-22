@@ -6,6 +6,7 @@ export type LandingProject = {
   fullFrame?: boolean
   images?: { render: string; base?: string }
   exterior?: boolean
+  modelStudy?: boolean
 }
 
 // Pares da seleção aprovada para a landing. O crédito acompanha cada vista.
@@ -68,11 +69,61 @@ const newExteriors: LandingProject[] = [
   },
 ]
 
-export const exteriorProjects = [...newExteriors, ...originalProjects.filter(project => project.exterior)]
-export const interiorProjects = [...reviewProjects, ...originalProjects.filter(project => !project.exterior)]
+const additionalUserInteriors: LandingProject[] = [
+  {
+    id: '335', title: 'Cozinha com ilha de madeira e vigas aparentes', author: 'Bruna Plentz',
+    alt: 'Cozinha com ilha de madeira ao sol, vigas de madeira no teto e mesa de jantar junto à lareira.',
+    images: { render: '/cliente-bruna-cozinha-ilha-madeira-335.jpg' },
+  },
+  {
+    id: 'apartamento-integrado', title: 'Apartamento integrado', author: 'Nathalia Costa',
+    alt: 'Sala entre painéis escuros de madeira ripada, com TV à direita e mesa de jantar ao fundo, junto à janela.',
+    images: { render: '/cliente-nathalia-apartamento-integrado.jpg' },
+  },
+]
+
+export const userProjects = [...additionalUserInteriors, ...originalProjects, ...reviewProjects]
+
+type ReviewImage = `/review-assets/${string}.webp`
+type DownloadedModel = LandingProject & { exterior: boolean; images: { render: ReviewImage; base?: ReviewImage } }
+
+// Vistas produzidas localmente a partir dos SKPs. Cada base usa a câmera do respectivo render.
+const downloadedModels: DownloadedModel[] = [
+  {
+    id: 'casa-white-piscina', exterior: true, title: 'Casa White · Piscina e solário',
+    author: 'Modelo de justnecessary',
+    alt: 'Volume branco em balanço sobre uma base de tijolos, com espreguiçadeiras ao lado da piscina.',
+    images: { render: '/review-assets/casa-white-piscina-render.webp', base: '/review-assets/casa-white-piscina-base.webp' },
+  },
+  {
+    id: 'modern-residence-fachada', exterior: true, fullFrame: true, title: 'Modern Residence · Fachada urbana',
+    author: 'Modelo de nabinthapaliya446',
+    alt: 'Casa de três pavimentos com tijolos aparentes, pórticos de concreto claro, esquadrias escuras e varandas envidraçadas, vista da rua.',
+    images: { render: '/review-assets/modern-residence-fachada-render.webp', base: '/review-assets/modern-residence-fachada-base.webp' },
+  },
+  {
+    id: 'casa-white-varanda', exterior: true, title: 'Casa White · Varanda coberta',
+    author: 'Modelo de justnecessary',
+    alt: 'Poltronas arredondadas e sofá sob o balanço da Casa White, com as espreguiçadeiras da piscina vistas de lado.',
+    images: { render: '/review-assets/casa-white-varanda-render.webp', base: '/review-assets/casa-white-varanda-base.webp' },
+  },
+]
+
+export const modelStudies = downloadedModels.map(project => ({
+  ...project,
+  modelStudy: true,
+  author: `Render 3D convencional · ${project.author}`,
+}))
+
+export const exteriorProjects = [
+  ...modelStudies.filter(project => project.exterior), ...newExteriors, ...originalProjects.filter(project => project.exterior),
+]
+export const interiorProjects = [
+  ...modelStudies.filter(project => !project.exterior), ...additionalUserInteriors, ...reviewProjects, ...originalProjects.filter(project => !project.exterior),
+]
 
 export const projectById = new Map<string, LandingProject>(
-  [...originalProjects, ...reviewProjects, ...newExteriors].map(project => [project.id, project])
+  [...userProjects, ...newExteriors, ...modelStudies].map(project => [project.id, project])
 )
 
 export function projectImages(project: LandingProject): { render: string; base?: string } {
