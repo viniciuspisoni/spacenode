@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { exteriorProjects, interiorProjects, modelStudies, originalProjects, projectById, projectImages, userProjects, type LandingProject } from './projectImageCatalog'
+import { curatedUserProjectIds, exteriorProjects, interiorProjects, modelStudies, originalProjects, projectById, projectImages, userProjects, type LandingProject } from './projectImageCatalog'
 import { CoverComparison } from './CoverComparison'
 import styles from './ProjectImageReview.module.css'
 
@@ -16,24 +16,32 @@ const groups = {
 
 const storageKey = 'spacenode:landing:project-selection:v1'
 const changeEvent = 'spacenode-project-selection-change'
-const originalIds = originalProjects.map(project => project.id)
 let memoryOverride: string | null = null
 
 function readSaved() {
+  if (new URLSearchParams(window.location.search).get('selecao') === 'usuarios') return ''
   if (memoryOverride !== null) return memoryOverride
   try { return window.localStorage.getItem(storageKey) || '' } catch { return '' }
 }
 
 function subscribe(onChange: () => void) {
   window.addEventListener('storage', onChange)
+  window.addEventListener('popstate', onChange)
   window.addEventListener(changeEvent, onChange)
   return () => {
     window.removeEventListener('storage', onChange)
+    window.removeEventListener('popstate', onChange)
     window.removeEventListener(changeEvent, onChange)
   }
 }
 
 function save(ids: string[] | null) {
+  // Abrir o link da curadoria preserva a escolha pessoal até o próximo salvamento.
+  const url = new URL(window.location.href)
+  if (url.searchParams.get('selecao') === 'usuarios') {
+    url.searchParams.delete('selecao')
+    window.history.replaceState(window.history.state, '', url)
+  }
   const raw = ids ? JSON.stringify(ids) : ''
   try {
     if (ids) window.localStorage.setItem(storageKey, raw)
@@ -56,7 +64,7 @@ function readIds(raw: string): string[] {
       }
     } catch { /* Uma seleção de uma versão antiga pode ser restaurada. */ }
   }
-  return originalIds
+  return curatedUserProjectIds
 }
 
 function projectsFrom(ids: string[]) {
@@ -74,7 +82,7 @@ export function ProjectImageReview({ renderGallery }: { renderGallery: (projects
   const stored = useSyncExternalStore(subscribe, readSaved, () => '')
   const applied = readIds(stored)
   const [draft, setDraft] = useState<string[] | null>(null)
-  const [group, setGroup] = useState<keyof typeof groups>(modelStudies.length ? 'models' : 'exterior')
+  const [group, setGroup] = useState<keyof typeof groups>('users')
   const [notice, setNotice] = useState('')
   const [manualCopy, setManualCopy] = useState('')
   const panel = useRef<HTMLDetailsElement>(null)
@@ -129,7 +137,7 @@ export function ProjectImageReview({ renderGallery }: { renderGallery: (projects
     save(null)
     setDraft(null)
     setManualCopy('')
-    setNotice('A capa e a galeria originais foram restauradas.')
+    setNotice('A seleção de cinco projetos de usuários foi restaurada.')
   }
 
   async function copySelection() {
@@ -156,9 +164,9 @@ export function ProjectImageReview({ renderGallery }: { renderGallery: (projects
         <summary><strong>Escolher imagens da prévia</strong><span aria-hidden="true" className={styles.indicator} /></summary>
         <div className={styles.content}>
           <p className={styles.intro}>Escolha a foto que abre a página e marque as outras imagens da galeria. Suas escolhas ficam neste navegador.</p>
-          <CoverComparison cover={cover} chooseCover={chooseCover} />
+          <CoverComparison cover={cover} chooseCover={chooseCover} usersOnly={group === 'users'} />
           <div role="group" aria-label="Conjunto de imagens" className={styles.filters}>
-            {(['models', 'users', 'exterior', 'interior', 'original'] as const).filter(key => groups[key].projects.length > 0).map(key => (
+            {(['users', 'exterior', 'interior', 'models', 'original'] as const).filter(key => groups[key].projects.length > 0).map(key => (
               <button key={key} type="button" aria-pressed={group === key} onClick={() => setGroup(key)}>
                 {groups[key].label} ({groups[key].projects.length})
               </button>
@@ -199,7 +207,7 @@ export function ProjectImageReview({ renderGallery }: { renderGallery: (projects
           <div className={styles.actions}>
             <button type="button" className={styles.apply} onClick={apply}>Aplicar e ver na página</button>
             <button type="button" className={styles.copy} onClick={copySelection}>Copiar seleção</button>
-            <button type="button" className={styles.textButton} onClick={restore}>Restaurar seleção original</button>
+            <button type="button" className={styles.textButton} onClick={restore}>Restaurar curadoria</button>
           </div>
           <p role="status" className={styles.notice}>{notice}</p>
           {manualCopy && <textarea ref={copyField} readOnly value={manualCopy} className={styles.copyField} aria-label="Texto da seleção para copiar" />}

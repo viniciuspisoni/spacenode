@@ -2,28 +2,35 @@
 
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
-import { exteriorProjects, interiorProjects, projectImages, type LandingProject } from './projectImageCatalog'
+import { exteriorProjects, interiorProjects, projectImages, userProjects, type LandingProject } from './projectImageCatalog'
 import galleryStyles from './EditorialProjects.module.css'
 import styles from './ProjectImageReview.module.css'
 
-const comparisonGroups = {
+const allGroups = {
   exterior: { name: 'Área externa', projects: exteriorProjects },
   interior: { name: 'Interior', projects: interiorProjects },
 }
 
-type Group = keyof typeof comparisonGroups
+const userGroups = {
+  exterior: { name: 'Área externa', projects: userProjects.filter(project => project.exterior) },
+  interior: { name: 'Interior', projects: userProjects.filter(project => !project.exterior) },
+}
 
-export function CoverComparison({ cover, chooseCover }: { cover: LandingProject; chooseCover: (id: string) => void }) {
+type Group = keyof typeof allGroups
+
+export function CoverComparison({ cover, chooseCover, usersOnly }: {
+  cover: LandingProject; chooseCover: (id: string) => void; usersOnly: boolean
+}) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState<Group>('exterior')
-  const [options, setOptions] = useState({
-    exterior: exteriorProjects[0].id,
-    interior: interiorProjects[0].id,
-  })
+  const [options, setOptions] = useState<Partial<Record<Group, string>>>({})
   const [aspectRatio, setAspectRatio] = useState<string>()
-  const currentGroup = comparisonGroups[active]
-  const project = currentGroup.projects.find(item => item.id === options[active]) ?? currentGroup.projects[0]
-
+  const comparisonGroups = usersOnly ? userGroups : allGroups
+  function selectedProject(group: Group) {
+    const { projects } = comparisonGroups[group]
+    return projects.find(item => item.id === options[group]) ?? projects[0]
+  }
+  const project = selectedProject(active)
   const { render } = projectImages(project)
 
   useEffect(() => {
@@ -51,7 +58,7 @@ export function CoverComparison({ cover, chooseCover }: { cover: LandingProject;
           {(['exterior', 'interior'] as const).map(group => (
             <label key={group}>
               {group === 'exterior' ? 'Foto externa' : 'Foto de interior'}
-              <select value={options[group]} onChange={event => selectOption(group, event.target.value)}>
+              <select value={selectedProject(group).id} onChange={event => selectOption(group, event.target.value)}>
                 {comparisonGroups[group].projects.map(option => <option key={option.id} value={option.id}>{option.title}</option>)}
               </select>
             </label>

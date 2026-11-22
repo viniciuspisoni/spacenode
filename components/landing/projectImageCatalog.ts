@@ -11,7 +11,7 @@ export type LandingProject = {
 
 // Pares da seleção aprovada para a landing. O crédito acompanha cada vista.
 export const originalProjects: LandingProject[] = [
-  { id: '142', exterior: true, title: 'Pátio com espelho d’água', author: 'muda arquitetura', alt: 'Pátio arborizado com volumes de concreto, espelho d’água e deck de madeira.' },
+  { id: '142', exterior: true, title: 'Pátio com lareira externa', author: 'muda arquitetura', alt: 'Lareira acesa no deck de um pátio arborizado, com a casa de concreto ao fundo.' },
   { id: '183', title: 'Sala com painel de madeira', author: 'Bruna Plentz', alt: 'Living integrado com painel de madeira, poltrona caramelo e tapete azul.' },
   { id: '13', exterior: true, title: 'Fachada residencial', author: 'Natália Benchimol Maggi', alt: 'Fachada de dois pavimentos com volumes brancos, revestimento de pedra e jardim.' },
   { id: '345', title: 'Quarto com detalhes amarelos', author: 'Nathalia Costa', alt: 'Quarto com iluminação indireta, marcenaria escura e roupa de cama com detalhes amarelos.' },
@@ -82,7 +82,11 @@ const additionalUserInteriors: LandingProject[] = [
   },
 ]
 
-export const userProjects = [...additionalUserInteriors, ...originalProjects, ...reviewProjects]
+export const curatedUserProjectIds = ['13', '142', 'living-jantar', 'cozinha-ilha', 'sala-jantar']
+const curatedOrder = new Map(curatedUserProjectIds.map((id, index) => [id, index]))
+export const userProjects = [...additionalUserInteriors, ...originalProjects, ...reviewProjects].sort(
+  (a, b) => (curatedOrder.get(a.id) ?? curatedOrder.size) - (curatedOrder.get(b.id) ?? curatedOrder.size),
+)
 
 type ReviewImage = `/review-assets/${string}.webp`
 type DownloadedModel = LandingProject & { exterior: boolean; images: { render: ReviewImage; base?: ReviewImage } }
