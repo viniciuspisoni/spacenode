@@ -1,0 +1,152 @@
+.section {
+  width: min(90vw, 1200px);
+  margin-inline: auto;
+  padding-block: clamp(56px, 7vw, 104px);
+  scroll-margin-top: 80px;
+  color: #191b18;
+}
+
+.heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: clamp(26px, 3.3vw, 44px);
+}
+
+.heading h2,
+.caption h3 {
+  margin: 0;
+  color: inherit;
+  font-weight: 500;
+}
+
+.heading h2 {
+  font-size: clamp(36px, 4.5vw, 64px);
+  line-height: 1.02;
+  letter-spacing: -0.056em;
+}
+
+.heading p,
+.caption p,
+.plugin {
+  margin: 0;
+  color: #565953;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.heading p {
+  max-width: 37ch;
+}
+
+.examples {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(18px, 2vw, 30px);
+}
+
+.examples figure {
+  margin: 0;
+}
+
+.media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #e6e5df;
+  border-radius: 4px;
+}
+
+.media img,
+.media video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.caption {
+  padding-top: 16px;
+}
+
+.caption h3 {
+  margin-bottom: 6px;
+  font-size: clamp(22px, 2.15vw, 32px);
+  line-height: 1.15;
+  letter-spacing: -0.045em;
+}
+
+.caption p {
+  max-width: 49ch;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.swatches button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 13px;
+  border: 1px solid #c9ccc4;
+  border-radius: 30px;
+  background: transparent;
+  color: #363933;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.swatches button[aria-pressed='true'] {
+  border-color: #41453d;
+  background: #eceee7;
+}
+
+.swatches button span {
+  display: block;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+}
+
+.plugin {
+  margin-top: clamp(26px, 3.4vw, 48px);
+  border-top: 1px solid #d8dbd3;
+  padding-top: 20px;
+}
+
+.plugin a {
+  color: #252923;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.swatches button:focus-visible,
+.plugin a:focus-visible,
+.media video:focus-visible {
+  outline: 2px solid #3d5940;
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .heading {
+    display: block;
+  }
+
+  .heading p {
+    margin-top: 14px;
+  }
+
+  .examples {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
