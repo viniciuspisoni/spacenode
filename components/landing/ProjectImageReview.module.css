@@ -1,0 +1,132 @@
+.fullFrame,
+.fullFrame :global(.spn-ba) {
+  background: #e8e9e5;
+}
+
+.fullFrame img {
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+.panel {
+  width: min(90%, 1200px);
+  margin: 16px auto 0;
+  border: 1px solid #d1d4ce;
+  border-radius: 4px;
+  background: #f7f8f4;
+  color: #1b1e1a;
+  scroll-margin-top: 84px;
+}
+
+.panel summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 18px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.panel summary::-webkit-details-marker { display: none; }
+.panel summary strong { font-size: 15px; font-weight: 550; }
+.indicator::before { content: '+'; font-size: 22px; line-height: 1; }
+.panel[open] .indicator::before { content: '−'; }
+.panel[open] summary { border-bottom: 1px solid #d1d4ce; }
+.content { padding: clamp(12px, 2vw, 24px); }
+.intro, .selection p, .card p, .notice { margin: 0; line-height: 1.45; }
+.intro { color: #4d524a; font-size: 15px; }
+
+.filters, .actions, .choices, .selection {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.filters, .actions { gap: 8px; }
+.filters { margin: 16px 0 18px; }
+.filters button, .actions button, .textButton {
+  min-height: 44px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.25;
+  cursor: pointer;
+}
+.filters button, .apply, .copy {
+  padding: 9px 13px;
+  border: 1px solid #a8aea5;
+  border-radius: 3px;
+  background: transparent;
+  color: #252923;
+}
+.filters button[aria-pressed='true'], .apply {
+  background: #242725;
+  border-color: #242725;
+  color: #fff;
+}
+.textButton {
+  padding: 7px 4px;
+  color: #353b33;
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.textButton:disabled { opacity: .45; cursor: default; }
+.panel :is(summary,button,input,textarea):focus-visible {
+  outline: 2px solid #3c5b42;
+  outline-offset: 3px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px 16px;
+}
+.card { min-width: 0; margin: 0; }
+.thumbnail {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: #e8e9e5;
+}
+.thumbnail img { object-fit: contain; }
+.card h3 { margin: 8px 0 2px; font-size: 15px; line-height: 1.25; font-weight: 550; }
+.card p { color: #565c53; font-size: 13px; }
+.choices { gap: 2px 12px; }
+.choices label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.choices input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #242725;
+}
+.selection {
+  justify-content: space-between;
+  gap: 0 12px;
+  margin: 16px 0 8px;
+  padding-top: 12px;
+  border-top: 1px solid #d1d4ce;
+}
+.selection p { font-size: 14px; }
+.selection strong { font-weight: 550; }
+.selection span { color: #575d54; }
+.notice { margin-top: 12px; color: #454d41; font-size: 14px; }
+.notice:empty { margin: 0; }
+.copyField { margin-top: 10px; width: 100%; min-height: 110px; padding: 8px; color: #242725; background: #fff; }
+
+@media (max-width: 920px) {
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; }
+  .choices { gap: 0 6px; }
+  .choices label { gap: 3px; }
+  .card h3 { font-size: 14px; }
+  .filters button { font-size: 13px; padding-inline: 8px; }
+  .actions { align-items: stretch; }
+}

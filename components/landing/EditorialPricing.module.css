@@ -114,6 +114,7 @@
 .card[data-featured='true'] .checkout, .section .checkout:hover { color: #fff; background: var(--ink); border-color: var(--ink); }
 .card[data-featured='true'] .checkout:hover { background: #37424f; }
 .section button:disabled { opacity: .65; cursor: wait; }
+.reviewNote { margin: 10px 0 0; font-size: .875rem; line-height: 1.45; color: var(--muted); }
 .error { margin: 10px 0 0; font-size: 13px; color: #9b342c; }
 .note { max-width: 900px; margin: 15px 0 30px; color: var(--muted); font-size: 12px; line-height: 1.65; }
 

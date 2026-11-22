@@ -73,10 +73,12 @@ function VolumeCalculator() {
   )
 }
 
-export function EditorialPricing() {
+export function EditorialPricing({ review = false }: { review?: boolean }) {
+  const showBothCycles = ANNUAL_BILLING_ENABLED || review
   const section = useRef<HTMLElement>(null)
-  const [billing, setBilling] = useState<BillingCycle>(ANNUAL_BILLING_ENABLED ? 'annual' : 'monthly')
+  const [billing, setBilling] = useState<BillingCycle>(showBothCycles ? 'annual' : 'monthly')
   const [pending, setPending] = useState<SellablePlanId | null>(null)
+  const [previewedPlan, setPreviewedPlan] = useState<SellablePlanId | null>(null)
   const [failed, setFailed] = useState<SellablePlanId | null>(null)
 
   useEffect(() => {
@@ -94,11 +96,16 @@ export function EditorialPricing() {
   function selectCycle(cycle: BillingCycle) {
     if (cycle === billing) return
     setBilling(cycle)
+    setPreviewedPlan(null)
     setFailed(null)
     track('cta_clicked', { surface: 'landing', cta: 'billing_cycle', billing: cycle })
   }
 
   async function selectPlan(id: SellablePlanId) {
+    if (billing === 'annual' && !ANNUAL_BILLING_ENABLED) {
+      setPreviewedPlan(id)
+      return
+    }
     setPending(id)
     setFailed(null)
     track('cta_clicked', { surface: 'landing', cta: 'pricing_card', plan: id, billing })
@@ -128,7 +135,7 @@ export function EditorialPricing() {
             <h2 id="plans-title">Planos para o seu ritmo de trabalho.</h2>
             <p>Os Nodes são os créditos que você usa para gerar imagens e vídeos. Escolha o volume de que precisa por mês.</p>
           </div>
-          {ANNUAL_BILLING_ENABLED && (
+          {showBothCycles && (
             <div className={styles.toggle} role="group" aria-label="Período de cobrança">
               <button type="button" aria-pressed={billing === 'monthly'} disabled={pending !== null}
                 onClick={() => selectCycle('monthly')}>Mensal</button>
@@ -164,6 +171,7 @@ export function EditorialPricing() {
                   onClick={() => void selectPlan(plan.id)}>
                   {pending === plan.id ? 'Abrindo…' : plan.cta}
                 </button>
+                {previewedPlan === plan.id && <p role="status" className={styles.reviewNote}>O valor anual está disponível para comparação nesta prévia.</p>}
                 {failed === plan.id && <p role="alert" className={styles.error}>Não foi possível abrir o pagamento. Tente novamente.</p>}
               </article>
             )
