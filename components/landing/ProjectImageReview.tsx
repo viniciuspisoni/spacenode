@@ -2,8 +2,15 @@
 
 import Image from 'next/image'
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { originalProjects, projectById, projectImages, reviewProjects, type LandingProject } from './projectImageCatalog'
+import { exteriorProjects, interiorProjects, originalProjects, projectById, projectImages, type LandingProject } from './projectImageCatalog'
+import { CoverComparison } from './CoverComparison'
 import styles from './ProjectImageReview.module.css'
+
+const groups = {
+  exterior: { label: 'Fachadas e externas', projects: exteriorProjects },
+  interior: { label: 'Interiores', projects: interiorProjects },
+  original: { label: 'Galeria original', projects: originalProjects },
+} satisfies Record<string, { label: string; projects: LandingProject[] }>
 
 const storageKey = 'spacenode:landing:project-selection:v1'
 const changeEvent = 'spacenode-project-selection-change'
@@ -65,14 +72,14 @@ export function ProjectImageReview({ renderGallery }: { renderGallery: (projects
   const stored = useSyncExternalStore(subscribe, readSaved, () => '')
   const applied = readIds(stored)
   const [draft, setDraft] = useState<string[] | null>(null)
-  const [group, setGroup] = useState<'new' | 'original'>('new')
+  const [group, setGroup] = useState<keyof typeof groups>('exterior')
   const [notice, setNotice] = useState('')
   const [manualCopy, setManualCopy] = useState('')
   const panel = useRef<HTMLDetailsElement>(null)
   const copyField = useRef<HTMLTextAreaElement>(null)
   const selected = draft ?? applied
   const [cover, ...remaining] = projectsFrom(selected)
-  const candidates = group === 'new' ? reviewProjects : originalProjects
+  const candidates = groups[group].projects
 
   useEffect(() => {
     function openFromLink() {
@@ -94,6 +101,10 @@ export function ProjectImageReview({ renderGallery }: { renderGallery: (projects
     setDraft(ids)
     setManualCopy('')
     setNotice('')
+  }
+
+  function chooseCover(id: string) {
+    edit([id, ...selected.filter(value => value !== id)])
   }
 
   function toggleImage(id: string) {
@@ -143,33 +154,40 @@ export function ProjectImageReview({ renderGallery }: { renderGallery: (projects
         <summary><strong>Escolher imagens da prévia</strong><span aria-hidden="true" className={styles.indicator} /></summary>
         <div className={styles.content}>
           <p className={styles.intro}>Escolha a foto que abre a página e marque as outras imagens da galeria. Suas escolhas ficam neste navegador.</p>
+          <CoverComparison cover={cover} chooseCover={chooseCover} />
           <div role="group" aria-label="Conjunto de imagens" className={styles.filters}>
-            <button type="button" aria-pressed={group === 'new'} onClick={() => setGroup('new')}>Outras opções ({reviewProjects.length})</button>
-            <button type="button" aria-pressed={group === 'original'} onClick={() => setGroup('original')}>Galeria original ({originalProjects.length})</button>
+            {(['exterior', 'interior', 'original'] as const).map(key => (
+              <button key={key} type="button" aria-pressed={group === key} onClick={() => setGroup(key)}>
+                {groups[key].label} ({groups[key].projects.length})
+              </button>
+            ))}
           </div>
           <div className={styles.grid}>
-            {candidates.map(project => (
-              <article key={project.id} className={styles.card} data-project-id={project.id} aria-label={project.title}>
-                <div className={styles.thumbnail}>
-                  <Image src={projectImages(project).render} alt={project.alt} fill sizes="(max-width: 600px) 43vw, (max-width: 920px) 28vw, 260px" />
-                </div>
-                <h3>{project.title}</h3>
-                <p>{project.author}</p>
-                <div className={styles.choices}>
-                  <label>
-                    <input type="radio" name="spacenode-review-cover" checked={cover.id === project.id}
-                      aria-label={`Capa — ${project.title}`}
-                      onChange={() => edit([project.id, ...selected.filter(id => id !== project.id)])} />
-                    Capa
-                  </label>
-                  <label>
-                    <input type="checkbox" checked={selected.includes(project.id)} disabled={cover.id === project.id}
-                      aria-label={`Galeria — ${project.title}`} onChange={() => toggleImage(project.id)} />
-                    Galeria
-                  </label>
-                </div>
-              </article>
-            ))}
+            {candidates.map(project => {
+              const { render } = projectImages(project)
+              return (
+                <article key={project.id} className={styles.card} data-project-id={project.id} aria-label={project.title}>
+                  <div className={styles.thumbnail}>
+                    <Image src={render} unoptimized={render.startsWith('/review-assets/')} alt={project.alt} fill sizes="(max-width: 600px) 43vw, (max-width: 920px) 28vw, 260px" />
+                  </div>
+                  <h3>{project.title}</h3>
+                  <p>{project.author}</p>
+                  <div className={styles.choices}>
+                    <label>
+                      <input type="radio" name="spacenode-review-cover" checked={cover.id === project.id}
+                        aria-label={`Capa — ${project.title}`}
+                        onChange={() => chooseCover(project.id)} />
+                      Capa
+                    </label>
+                    <label>
+                      <input type="checkbox" checked={selected.includes(project.id)} disabled={cover.id === project.id}
+                        aria-label={`Galeria — ${project.title}`} onChange={() => toggleImage(project.id)} />
+                      Galeria
+                    </label>
+                  </div>
+                </article>
+              )
+            })}
           </div>
           <div className={styles.selection}>
             <p aria-live="polite">Capa · <strong>{cover.title}</strong> <span>({selected.length} {selected.length === 1 ? 'imagem' : 'imagens'} na galeria)</span></p>

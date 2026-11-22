@@ -32,13 +32,13 @@ function Gallery({ projects }: { projects: LandingProject[] }) {
     <section id="projetos" tabIndex={-1} aria-label="Galeria de projetos realizados com a SpaceNode" className={styles.projects}>
       <figure>
         <div className={project.fullFrame ? `${styles.media} ${reviewStyles.fullFrame}` : styles.media}>
-          {compare
+          {compare && base
             ? <BeforeAfter key={project.id} base={base} render={render} sizes="(max-width: 700px) 100vw, 94vw" aspect="auto" />
-            : <Image src={render} alt={project.alt} fill preload={index === 0} sizes="(max-width: 700px) 100vw, 94vw" className={styles.image} />}
-          <button type="button" className={styles.compare} aria-pressed={compare} onClick={() => setCompare(value => !value)}>
+            : <Image src={render} unoptimized={render.startsWith('/review-assets/')} alt={project.alt} fill preload={index === 0} sizes="(max-width: 700px) 100vw, 94vw" className={styles.image} />}
+          {base && <button type="button" className={styles.compare} aria-pressed={compare} onClick={() => setCompare(value => !value)}>
             <svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2" y="4" width="16" height="12" rx="1.2" stroke="currentColor" strokeWidth="1.4"/><path d="M9 2v16" stroke="currentColor" strokeWidth="1.5"/></svg>
             {compare ? 'Ver só o render' : 'Comparar com o original'}
-          </button>
+          </button>}
         </div>
         <figcaption className={styles.caption}>
           <div className={styles.credit} aria-live="polite" aria-atomic="true"><strong>{project.title}</strong><span>{project.author}</span></div>

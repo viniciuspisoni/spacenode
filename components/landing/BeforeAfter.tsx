@@ -69,6 +69,7 @@ export function BeforeAfter({
     >
       <Image
         src={base}
+        unoptimized={typeof base === 'string' && base.startsWith('/review-assets/')}
         alt="Imagem base — modelo do projeto"
         fill
         draggable={false}
@@ -81,6 +82,7 @@ export function BeforeAfter({
       />
       <Image
         src={render}
+        unoptimized={typeof render === 'string' && render.startsWith('/review-assets/')}
         alt="Resultado SpaceNode — render fotorrealista"
         fill
         draggable={false}

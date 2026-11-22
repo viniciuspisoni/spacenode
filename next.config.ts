@@ -28,6 +28,9 @@ const nextConfig: NextConfig = {
   // Permite um dev server paralelo (ex.: preview de outra sessão) sem colidir
   // com o lock por distDir do Next 16. Builds de produção ignoram (default .next).
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  outputFileTracingIncludes: {
+    '/review-assets/*': ['./marketing/landing-review/*.webp'],
+  },
   experimental: {
     // Com proxy.ts presente, o Next bufferiza o body e TRUNCA em 10MB por
     // default — multipart acima disso chega corrompido na rota e formData()
