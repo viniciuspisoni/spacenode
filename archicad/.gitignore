@@ -1,0 +1,5 @@
+# fetched / generated — never commit
+.deps/
+build/
+dist/
+RFIX/Images/SpaceNodePanel.html

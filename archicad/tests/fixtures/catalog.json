@@ -1,0 +1,74 @@
+{
+ "engines": [
+  {
+   "id": "vega",
+   "name": "Vega",
+   "resolutions": [
+    {
+     "id": "hd",
+     "label": "HD",
+     "nodes": 10
+    },
+    {
+     "id": "4k",
+     "label": "4K",
+     "nodes": 40
+    }
+   ]
+  },
+  {
+   "id": "pulsar",
+   "name": "Pulsar",
+   "resolutions": [
+    {
+     "id": "hd",
+     "label": "HD",
+     "nodes": 4
+    }
+   ]
+  }
+ ],
+ "defaults": {
+  "engine": "vega",
+  "resolution": "hd"
+ },
+ "projectTypes": [
+  {
+   "id": "interior",
+   "label": "Interior",
+   "backgrounds": [
+    "Preservar Original",
+    "Jardim"
+   ],
+   "backgroundLabel": "Contexto",
+   "segments": [
+    {
+     "name": "Residencial",
+     "environments": [
+      "Sala de estar",
+      "Quarto"
+     ],
+     "lighting": [
+      "Luz natural"
+     ],
+     "sceneElements": [
+      "Plantas",
+      "Tapete"
+     ]
+    }
+   ]
+  }
+ ],
+ "i18n": {
+  "en": {
+   "presets": {
+    "Sala de estar": "Living room"
+   },
+   "ui": {
+    "projectTypes": {
+     "interior": "Interior"
+    }
+   }
+  }
+ }
+}
