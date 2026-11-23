@@ -8,6 +8,12 @@ describe('detectClient', () => {
     expect(detectClient(null, { kind: 'web', version: '0.0.1' })).toEqual({ kind: 'web', version: '0.0.1' })
   })
 
+  it('reconhece os add-ons Archicad e Revit', () => {
+    expect(detectClient('SpaceNode-Archicad/1.0.0', { kind: 'archicad', version: '1.0.0' })).toEqual({ kind: 'archicad', version: '1.0.0' })
+    expect(detectClient(null, { kind: 'revit', version: '2.1.0' })).toEqual({ kind: 'revit', version: '2.1.0' })
+    expect(detectClient(null, { kind: 'unknown' })).toEqual({ kind: 'unknown', version: null })
+  })
+
   it('versão fora do formato x.y.z é descartada, kind fica', () => {
     expect(detectClient(null, { kind: 'sketchup', version: '1.9' })).toEqual({ kind: 'sketchup', version: null })
     expect(detectClient(null, { kind: 'sketchup', version: '<script>' })).toEqual({ kind: 'sketchup', version: null })

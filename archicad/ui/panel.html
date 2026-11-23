@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpaceNode</title>
+<style>
+  /* SpaceNode — Manual da Marca v2.0. Tokens espelham sketchup/spacenode/dialog.html
+     (que espelha app/globals.css): monocromático, Geist Regular 400, sem cor de acento. */
+  @font-face { font-family: 'Geist'; src: url("/*__GEIST_FONT__*/") format('woff2'); font-weight: 100 900; font-display: swap; }
+  :root {
+    color-scheme: dark;
+    --bg: #151618; --bg-elevated: #1c1d20; --surface: rgba(255,255,255,0.05); --surface-hover: rgba(255,255,255,0.08);
+    --text: #ffffff; --text-2: #bdc2c8; --text-3: #8a8f97; --text-4: #53575e;
+    --border: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.16); --border-focus: rgba(255,255,255,0.40);
+    --input: rgba(255,255,255,0.05); --chip: rgba(255,255,255,0.06); --chip-hover: rgba(255,255,255,0.10);
+    --chip-active: #ffffff; --chip-active-fg: #151618; --inverse: #ffffff; --inverse-fg: #151618;
+    --error: #e0584a; --error-bg: rgba(224,88,74,0.08); --error-border: rgba(224,88,74,0.24);
+    --warning: #d4a327; --warning-bg: rgba(212,163,39,0.09); --warning-border: rgba(212,163,39,0.26);
+    --preview-bg: #101010; --scrollbar: rgba(255,255,255,0.16);
+    --r-card: 14px; --r-inner: 10px; --r-pill: 999px;
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  html.light {
+    color-scheme: light;
+    --bg: #f7f7f5; --bg-elevated: #ffffff; --surface: #ffffff; --surface-hover: #e8e8ed;
+    --text: #151618; --text-2: #60646b; --text-3: #6a6e75; --text-4: #bdc2c8;
+    --border: rgba(0,0,0,0.08); --border-strong: rgba(0,0,0,0.16); --border-focus: rgba(0,0,0,0.40);
+    --input: #ffffff; --chip: rgba(0,0,0,0.05); --chip-hover: rgba(0,0,0,0.09);
+    --chip-active: #151618; --chip-active-fg: #f7f7f5; --inverse: #151618; --inverse-fg: #f7f7f5;
+    --error: #c0392b; --error-bg: rgba(192,57,43,0.07); --error-border: rgba(192,57,43,0.22);
+    --warning: #8a6508; --warning-bg: rgba(184,134,11,0.09); --warning-border: rgba(184,134,11,0.28);
+    --preview-bg: #e9e9e7; --scrollbar: rgba(0,0,0,0.20);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 400 13px/1.45 'Geist', -apple-system, 'Segoe UI', sans-serif;
+         -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  ::-webkit-scrollbar { width: 10px; } ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 8px; border: 3px solid transparent; background-clip: content-box; }
+  button, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  .app { display: flex; flex-direction: column; min-height: 100%; }
+  header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+           background: var(--bg); border-bottom: 1px solid var(--border); }
+  header .logo { width: 20px; height: 20px; color: var(--text); flex: none; }
+  header .logo svg { width: 100%; height: 100%; display: block; }
+  header .name { font-size: 14px; letter-spacing: 0.02em; }
+  header .grow { flex: 1; }
+  .who { font-size: 12px; color: var(--text-3); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  main { padding: 16px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); padding: 14px; }
+  .card h2 { margin: 0 0 4px; font-size: 13px; font-weight: 400; color: var(--text); }
+  .muted { color: var(--text-3); }
+  .small { font-size: 12px; }
+  .label { display: block; margin: 0 0 6px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row.between { justify-content: space-between; }
+  .wrap { flex-wrap: wrap; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: var(--r-inner);
+         border: 1px solid var(--border-strong); background: var(--chip); transition: background .15s var(--ease), opacity .15s; }
+  .btn:hover:not(:disabled) { background: var(--chip-hover); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.primary { background: var(--inverse); color: var(--inverse-fg); border-color: transparent; }
+  .btn.primary:hover:not(:disabled) { opacity: .9; background: var(--inverse); }
+  .btn.block { width: 100%; }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--text-2); padding: 0 10px; }
+  .btn.ghost:hover:not(:disabled) { background: var(--chip); color: var(--text); }
+  .btn.sm { height: 30px; padding: 0 12px; font-size: 12px; }
+  .icon-btn { width: 30px; height: 30px; padding: 0; }
+
+  select, textarea { width: 100%; border-radius: var(--r-inner); border: 1px solid var(--border-strong); background: var(--input); padding: 8px 10px; }
+  select { height: 38px; appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%), linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+           background-position: calc(100% - 17px) 16px, calc(100% - 12px) 16px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 30px; }
+  textarea { resize: vertical; min-height: 72px; max-height: 200px; }
+  select:disabled, textarea:disabled { opacity: .5; }
+
+  .seg { display: flex; gap: 4px; padding: 3px; background: var(--chip); border-radius: var(--r-inner); }
+  .seg button { flex: 1; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); }
+  .seg button[aria-pressed="true"] { background: var(--chip-active); color: var(--chip-active-fg); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { height: 28px; padding: 0 12px; border-radius: var(--r-pill); border: 1px solid var(--border); background: var(--chip); color: var(--text-2); font-size: 12px; }
+  .chip:hover { background: var(--chip-hover); }
+  .chip[aria-pressed="true"] { background: var(--chip-active); color: var(--chip-active-fg); border-color: transparent; }
+
+  .engines { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .engine { height: 44px; border-radius: var(--r-inner); border: 1px solid var(--border-strong); background: var(--chip); text-align: left; padding: 0 12px; }
+  .engine[aria-pressed="true"] { background: var(--chip-active); color: var(--chip-active-fg); border-color: transparent; }
+
+  .code { font: 400 28px/1 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: 0.16em; text-align: center; padding: 18px 8px;
+          background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--r-inner); user-select: all; -webkit-user-select: all; }
+  .banner { padding: 10px 12px; border-radius: var(--r-inner); border: 1px solid var(--border); font-size: 12px; display: flex; gap: 8px; align-items: flex-start; }
+  .banner.error { background: var(--error-bg); border-color: var(--error-border); color: var(--text); }
+  .banner.warn { background: var(--warning-bg); border-color: var(--warning-border); }
+  .banner .x { margin-left: auto; background: none; border: 0; color: var(--text-3); padding: 0 4px; line-height: 1; font-size: 16px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); flex: none; margin-top: 5px; }
+  .error .dot { background: var(--error); } .warn .dot { background: var(--warning); }
+
+  .progress { height: 2px; border-radius: 2px; background: var(--chip); overflow: hidden; position: relative; }
+  .progress::after { content: ''; position: absolute; inset: 0 auto 0 0; width: 35%; background: var(--text); animation: slide 1.4s var(--ease) infinite; }
+  @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+  @media (prefers-reduced-motion: reduce) { .progress::after { animation: none; width: 100%; opacity: .5; } }
+
+  .result img { display: block; width: 100%; border-radius: var(--r-inner); background: var(--preview-bg); cursor: zoom-in; min-height: 120px; object-fit: contain; }
+  .kv { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--text-3); }
+  .kv b { font-weight: 400; color: var(--text-2); }
+  a.link { color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  footer { padding: 10px 16px 14px; font-size: 11px; color: var(--text-4); display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <span class="logo" aria-hidden="true"><!--__SYMBOL__--></span>
+    <span class="name">SpaceNode</span>
+    <span class="grow"></span>
+    <span class="who" id="who" hidden></span>
+    <button class="btn ghost icon-btn" id="menu-disconnect" hidden data-act="disconnect" aria-label="Desconectar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+    </button>
+  </header>
+  <main id="main"></main>
+  <footer><span id="foot-version">SpaceNode · Archicad</span><span id="foot-api"></span></footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── i18n ───────────────────────────────────────────────────────────────────
+  var STR = {
+    pt: {
+      connectTitle: 'Renderize a vista 3D do Archicad',
+      connectBody: 'Conecte sua conta SpaceNode para gerar renders fotorrealistas a partir da janela 3D que você está vendo — com a mesma fidelidade do app web.',
+      connect: 'Conectar conta', connecting: 'Conectando…', cancel: 'Cancelar', disconnect: 'Desconectar',
+      pairTitle: 'Aprove no navegador', pairBody: 'Abrimos a SpaceNode no seu navegador. Confira que o código abaixo é o mesmo e confirme.',
+      pairReopen: 'Abrir navegador de novo', pairExpires: 'Expira em', pairWaiting: 'Aguardando aprovação…',
+      balance: 'Saldo', nodes: 'Nodes', refresh: 'Atualizar',
+      view: 'Vista', viewBody: 'Usamos a janela 3D atual do Archicad, exatamente como aparece na tela. Enquadre a vista antes de gerar.',
+      open3d: 'Abrir janela 3D', testCapture: 'Testar captura 3D', captureOk: 'Captura 3D concluída. Nenhuma imagem foi enviada.', lastCapture: 'Última captura', lowRes: 'Imagem pequena. Aumente a janela 3D para um resultado mais nítido.',
+      project: 'Projeto', interior: 'Interior', exterior: 'Exterior', segment: 'Segmento', environment: 'Ambiente', lighting: 'Iluminação',
+      sceneElements: 'Elementos de cena', engine: 'Motor', resolution: 'Resolução', tweak: 'Ajuste fino (opcional)',
+      tweakPh: 'Ex.: madeira clara no piso, luz de fim de tarde…',
+      generate: 'Gerar render', generating: 'Gerando…', stageCapture: 'Capturando a vista 3D…', stageUpload: 'Enviando a imagem…',
+      stageGenerate: 'Gerando o render — pode levar alguns minutos', stageRecover: 'Procurando o render no histórico…', stageSave: 'Salvando…',
+      cancelWait: 'Parar de esperar', cancelNote: 'Se o render já estiver em andamento, ele ainda aparece no seu Histórico.',
+      result: 'Resultado', save: 'Salvar imagem', saved: 'Salvo em', reveal: 'Mostrar na pasta', openBrowser: 'Abrir no navegador',
+      refreshLink: 'Atualizar link', linkExpired: 'O link da imagem expirou. Atualize para ver de novo.', charged: 'Cobrado', recovered: 'Recuperado do histórico após uma queda de conexão.',
+      fidelityWarn: 'A fidelidade ao modelo ficou abaixo do esperado. Compare com a vista do Archicad antes de usar.',
+      buyNodes: 'Ver planos e Nodes', needNodes: 'Saldo insuficiente para este render',
+      loading: 'Carregando catálogo…',
+      e_not_connected: 'Conecte sua conta SpaceNode primeiro.', e_catalog_missing: 'O catálogo ainda não carregou. Tente de novo em instantes.',
+      e_invalid_options: 'Revise as opções do projeto.', e_insufficient_nodes: 'Saldo de Nodes insuficiente para este render.',
+      e_busy: 'Já existe uma geração em andamento.', e_no_3d_view: 'Abra a janela 3D (F3) e enquadre a vista que quer renderizar.',
+      e_capture_failed: 'Não foi possível capturar a vista 3D.', e_capture_demo: 'O modo Demo do Archicad não permite salvar a vista 3D. Ative uma licença para testar a captura.', e_capture_restricted: 'O Archicad recusou a captura. Feche diálogos ativos e tente de novo.', e_image_too_large: 'A imagem da vista passou de 15 MB. Reduza a janela 3D e tente de novo.',
+      e_pair_expired: 'O código expirou. Conecte de novo.', e_pair_failed: 'Não foi possível concluir a conexão.',
+      e_network: 'Sem conexão com a SpaceNode. Verifique a internet.', e_unauthorized: 'Sua sessão terminou. Conecte a conta de novo.',
+      e_rate_limited: 'Muitas tentativas. Aguarde um instante.', e_server: 'A SpaceNode não respondeu como esperado. Tente de novo.',
+      e_generate_failed: 'A geração falhou. Nenhum Node é cobrado se não houver render no Histórico.',
+      e_generate_lost: 'A conexão caiu durante a geração. Veja o Histórico antes de gerar de novo — os Nodes podem ter sido usados.',
+      e_save_failed: 'Não foi possível salvar a imagem.', e_bad_request: 'Pedido recusado pelo servidor.', e_not_found: 'Pareamento não encontrado no servidor.'
+    },
+    en: {
+      connectTitle: 'Render your Archicad 3D view',
+      connectBody: 'Connect your SpaceNode account to generate photorealistic renders from the 3D window you are looking at — with the same fidelity as the web app.',
+      connect: 'Connect account', connecting: 'Connecting…', cancel: 'Cancel', disconnect: 'Disconnect',
+      pairTitle: 'Approve in your browser', pairBody: 'We opened SpaceNode in your browser. Check that the code below matches, then confirm.',
+      pairReopen: 'Open browser again', pairExpires: 'Expires in', pairWaiting: 'Waiting for approval…',
+      balance: 'Balance', nodes: 'Nodes', refresh: 'Refresh',
+      view: 'View', viewBody: 'We use the current Archicad 3D window exactly as it appears on screen. Frame the view before generating.',
+      open3d: 'Open 3D window', testCapture: 'Test 3D capture', captureOk: '3D capture completed. No image was uploaded.', lastCapture: 'Last capture', lowRes: 'Small image. Enlarge the 3D window for a sharper result.',
+      project: 'Project', interior: 'Interior', exterior: 'Exterior', segment: 'Segment', environment: 'Space', lighting: 'Lighting',
+      sceneElements: 'Scene elements', engine: 'Engine', resolution: 'Resolution', tweak: 'Refinement (optional)',
+      tweakPh: 'E.g. light wood floor, late-afternoon light…',
+      generate: 'Generate render', generating: 'Generating…', stageCapture: 'Capturing the 3D view…', stageUpload: 'Uploading the image…',
+      stageGenerate: 'Generating the render — this can take a few minutes', stageRecover: 'Looking for the render in your history…', stageSave: 'Saving…',
+      cancelWait: 'Stop waiting', cancelNote: 'If the render is already running it will still show up in your History.',
+      result: 'Result', save: 'Save image', saved: 'Saved to', reveal: 'Show in folder', openBrowser: 'Open in browser',
+      refreshLink: 'Refresh link', linkExpired: 'The image link expired. Refresh to view it again.', charged: 'Charged', recovered: 'Recovered from your history after a connection drop.',
+      fidelityWarn: 'Fidelity to the model came out lower than expected. Compare it with the Archicad view before using it.',
+      buyNodes: 'See plans and Nodes', needNodes: 'Not enough Nodes for this render',
+      loading: 'Loading catalog…',
+      e_not_connected: 'Connect your SpaceNode account first.', e_catalog_missing: 'The catalog has not loaded yet. Try again in a moment.',
+      e_invalid_options: 'Review the project options.', e_insufficient_nodes: 'Not enough Nodes for this render.',
+      e_busy: 'A generation is already running.', e_no_3d_view: 'Open the 3D window (F3) and frame the view you want to render.',
+      e_capture_failed: 'Could not capture the 3D view.', e_capture_demo: 'Archicad Demo cannot save the 3D view. Activate a license to test capture.', e_capture_restricted: 'Archicad refused the capture. Close active dialogs and try again.', e_image_too_large: 'The view image is over 15 MB. Shrink the 3D window and try again.',
+      e_pair_expired: 'The code expired. Connect again.', e_pair_failed: 'Could not complete the connection.',
+      e_network: 'No connection to SpaceNode. Check your internet.', e_unauthorized: 'Your session ended. Connect your account again.',
+      e_rate_limited: 'Too many attempts. Wait a moment.', e_server: 'SpaceNode did not respond as expected. Try again.',
+      e_generate_failed: 'Generation failed. No Nodes are charged if there is no render in your History.',
+      e_generate_lost: 'The connection dropped during generation. Check your History before generating again — Nodes may have been used.',
+      e_save_failed: 'Could not save the image.', e_bad_request: 'The server rejected the request.', e_not_found: 'Pairing was not found on the server.'
+    }
+  };
+  var lang = /^en/i.test(navigator.language || '') ? 'en' : 'pt';
+  function t(key) { return (STR[lang] && STR[lang][key]) || STR.pt[key] || key; }
+  document.documentElement.lang = lang === 'en' ? 'en' : 'pt-BR';
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  var S = {
+    conn: 'unknown',            // unknown | disconnected | pairing | connected
+    email: '', apiBase: '', pairing: null,
+    balance: null, catalog: null,
+    form: { projectType: 'interior', segment: '', environment: '', lighting: '', background: '', sceneElements: [], engine: '', resolution: '', prompt: '' },
+    busy: false, stage: '', capture: null, result: null, savedPath: '', saving: false, error: null, now: Date.now(), themePref: null
+  };
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function safeImg(u) { return typeof u === 'string' && /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)[:\/])/.test(u); }
+
+  // ── Bridge ─────────────────────────────────────────────────────────────────
+  var pending = [];
+  function send(type, payload) {
+    var msg = JSON.stringify({ type: type, payload: payload || {} });
+    if (window.SpaceNode && typeof window.SpaceNode.post === 'function') window.SpaceNode.post(msg);
+    else pending.push(msg);
+  }
+  function flush() { if (window.SpaceNode && typeof window.SpaceNode.post === 'function') { while (pending.length) window.SpaceNode.post(pending.shift()); return true; } return false; }
+
+  window.SpaceNodeUI = {
+    receive: function (m) { try { onEvent(m.type, m.payload || {}); } catch (e) { if (window.console) console.error(e); } }
+  };
+
+  // ── Catalog helpers ────────────────────────────────────────────────────────
+  function typeDef() { var c = S.catalog; if (!c) return null; var l = c.projectTypes || []; for (var i = 0; i < l.length; i++) if (l[i].id === S.form.projectType) return l[i]; return null; }
+  function segmentDef() { var td = typeDef(); if (!td) return null; var l = td.segments || []; for (var i = 0; i < l.length; i++) if (l[i].name === S.form.segment) return l[i]; return null; }
+  function engineDef() { var c = S.catalog; if (!c) return null; var l = c.engines || []; for (var i = 0; i < l.length; i++) if (l[i].id === S.form.engine) return l[i]; return null; }
+  function presetLabel(v) { if (lang === 'en' && S.catalog && S.catalog.i18n && S.catalog.i18n.presets && S.catalog.i18n.presets[v]) return S.catalog.i18n.presets[v]; return v; }
+  function uiLabel(group, id, fallback) { var u = S.catalog && S.catalog.i18n && S.catalog.i18n.ui; if (lang === 'en' && u && u[group] && u[group][id]) return u[group][id]; return fallback; }
+  function cost() { var e = engineDef(); if (!e) return null; var r = e.resolutions || []; for (var i = 0; i < r.length; i++) if (r[i].id === S.form.resolution) return typeof r[i].nodes === 'number' ? r[i].nodes : null; return null; }
+  function totalBalance() { var b = S.balance; if (b == null) return null; if (typeof b === 'number') return b; var v = b.totalBalance != null ? b.totalBalance : (b.total_balance != null ? b.total_balance : b.total); return typeof v === 'number' ? v : null; }
+
+  function normalizeForm() {
+    var f = S.form, c = S.catalog; if (!c) return;
+    var types = c.projectTypes || [];
+    if (types.length && !typeDef()) f.projectType = types[0].id;
+    var td = typeDef();
+    if (td) {
+      var segs = td.segments || [];
+      if (segs.length && !segmentDef()) f.segment = segs[0].name;
+      var sd = segmentDef();
+      if (sd) {
+        if ((sd.environments || []).indexOf(f.environment) < 0) f.environment = (sd.environments || [])[0] || '';
+        if ((sd.lighting || []).indexOf(f.lighting) < 0) f.lighting = (sd.lighting || [])[0] || '';
+        f.sceneElements = f.sceneElements.filter(function (e) { return (sd.sceneElements || []).indexOf(e) >= 0; });
+      }
+      var bgs = td.backgrounds || [];
+      if (bgs.length && bgs.indexOf(f.background) < 0) f.background = bgs.indexOf('Preservar Original') >= 0 ? 'Preservar Original' : bgs[0];
+    }
+    var engines = c.engines || [];
+    if (engines.length && !engineDef()) f.engine = (c.defaults && c.defaults.engine) || engines[0].id;
+    var ed = engineDef();
+    if (ed) {
+      var ids = (ed.resolutions || []).map(function (r) { return r.id; });
+      if (ids.indexOf(f.resolution) < 0) f.resolution = ids.indexOf(c.defaults && c.defaults.resolution) >= 0 ? c.defaults.resolution : (ids[0] || '');
+    }
+  }
+
+  // ── Events from C++ ────────────────────────────────────────────────────────
+  function onEvent(type, p) {
+    if (type === 'connection') {
+      S.conn = p.status; S.apiBase = p.apiBase || S.apiBase; S.pairing = p.pairing || null;
+      if (p.email) S.email = p.email;
+      if (p.status === 'disconnected') { S.catalog = null; S.balance = null; S.busy = false; S.stage = ''; S.result = null; S.email = ''; }
+    } else if (type === 'session') {
+      if (p.email) S.email = p.email;
+      S.balance = p.balance; S.themePref = p.theme || null; applyTheme(S.themePref);
+    } else if (type === 'catalog') {
+      S.catalog = p.catalog; normalizeForm();
+    } else if (type === 'capture') {
+      S.capture = p;
+    } else if (type === 'status') {
+      S.stage = p.stage === 'cancelled' ? '' : p.stage;
+    } else if (type === 'busy') {
+      S.busy = !!p.busy; if (!S.busy) S.stage = '';
+    } else if (type === 'result') {
+      S.result = p; S.savedPath = ''; S.error = null; S.saving = false;
+      if (typeof p.totalBalance === 'number') S.balance = { totalBalance: p.totalBalance };
+    } else if (type === 'saved') {
+      S.savedPath = p.path || ''; S.saving = false; S.stage = '';
+    } else if (type === 'error') {
+      S.error = { scope: p.scope, code: p.code, message: p.message, field: p.field, httpStatus: p.httpStatus }; S.saving = false;
+      if (p.scope === 'save') S.stage = '';
+    }
+    render();
+  }
+
+  function errorText(e) {
+    if (!e) return '';
+    var key = 'e_' + e.code;
+    if (STR.pt[key]) {
+      var base = t(key);
+      if (e.scope === 'connect' && Number.isInteger(e.httpStatus) && e.httpStatus >= 100 && e.httpStatus <= 599)
+        return base + ' (HTTP ' + e.httpStatus + ')';
+      return base;
+    }
+    return e.message || t('e_server');
+  }
+
+  // ── Rendering ──────────────────────────────────────────────────────────────
+  var main = document.getElementById('main');
+
+  function optionList(values, selected) {
+    return (values || []).map(function (v) { return '<option value="' + esc(v) + '"' + (v === selected ? ' selected' : '') + '>' + esc(presetLabel(v)) + '</option>'; }).join('');
+  }
+
+  function viewSection() {
+    var c = S.capture, parts = [];
+    parts.push('<div class="card stack"><div><h2>' + t('view') + '</h2><p class="muted small" style="margin:0">' + t('viewBody') + '</p></div>');
+    parts.push('<div class="row between wrap"><button class="btn sm" data-act="activate3D">' + t('open3d') + '</button><button class="btn sm" data-act="testCapture"' + (S.busy ? ' disabled' : '') + '>' + t('testCapture') + '</button>');
+    if (c) parts.push('<span class="kv" style="gap:6px"><span>' + t('lastCapture') + '</span><b>' + esc(c.width) + ' × ' + esc(c.height) + ' px</b></span>');
+    parts.push('</div>');
+    if (c && c.lowResolution) parts.push('<div class="banner warn" role="status"><span class="dot"></span><span>' + t('lowRes') + '</span></div>');
+    if (c && c.diagnostic) parts.push('<div class="muted small" role="status">' + t('captureOk') + '</div>');
+    parts.push('</div>');
+    return parts.join('');
+  }
+
+  function projectSection() {
+    var td = typeDef(), sd = segmentDef(), f = S.form, h = [];
+    var types = (S.catalog.projectTypes || []);
+    h.push('<div class="card stack"><h2>' + t('project') + '</h2>');
+    h.push('<div class="seg" role="group" aria-label="' + t('project') + '">' + types.map(function (ty) {
+      return '<button data-act="projectType" data-v="' + esc(ty.id) + '" aria-pressed="' + (ty.id === f.projectType) + '">' + esc(uiLabel('projectTypes', ty.id, ty.label)) + '</button>'; }).join('') + '</div>');
+    if (td) {
+      h.push('<div><label class="label" for="f-segment">' + t('segment') + '</label><select id="f-segment" data-field="segment">' + optionList((td.segments || []).map(function (s) { return s.name; }), f.segment) + '</select></div>');
+    }
+    if (sd) {
+      h.push('<div><label class="label" for="f-environment">' + t('environment') + '</label><select id="f-environment" data-field="environment">' + optionList(sd.environments, f.environment) + '</select></div>');
+      h.push('<div><label class="label" for="f-lighting">' + t('lighting') + '</label><select id="f-lighting" data-field="lighting">' + optionList(sd.lighting, f.lighting) + '</select></div>');
+    }
+    if (td && (td.backgrounds || []).length) {
+      var bl = uiLabel('backgroundLabels', f.projectType, td.backgroundLabel || 'Contexto');
+      h.push('<div><label class="label" for="f-background">' + esc(bl) + '</label><select id="f-background" data-field="background">' + optionList(td.backgrounds, f.background) + '</select></div>');
+    }
+    if (sd && (sd.sceneElements || []).length) {
+      h.push('<div><span class="label">' + t('sceneElements') + '</span><div class="chips">' + sd.sceneElements.map(function (el) {
+        return '<button class="chip" data-act="element" data-v="' + esc(el) + '" aria-pressed="' + (f.sceneElements.indexOf(el) >= 0) + '">' + esc(presetLabel(el)) + '</button>'; }).join('') + '</div></div>');
+    }
+    h.push('</div>');
+    return h.join('');
+  }
+
+  function engineSection() {
+    var f = S.form, ed = engineDef(), h = [];
+    h.push('<div class="card stack"><h2>' + t('engine') + '</h2><div class="engines">' + (S.catalog.engines || []).map(function (e) {
+      return '<button class="engine" data-act="engine" data-v="' + esc(e.id) + '" aria-pressed="' + (e.id === f.engine) + '">' + esc(e.name) + '</button>'; }).join('') + '</div>');
+    if (ed) {
+      var desc = uiLabel('engineDescriptions', ed.id, ed.description || '');
+      if (desc) h.push('<p class="muted small" style="margin:0">' + esc(desc) + '</p>');
+      h.push('<div><span class="label">' + t('resolution') + '</span><div class="chips">' + (ed.resolutions || []).map(function (r) {
+        return '<button class="chip" data-act="resolution" data-v="' + esc(r.id) + '" aria-pressed="' + (r.id === f.resolution) + '">' + esc(r.label || r.id) + (typeof r.nodes === 'number' ? ' · ' + r.nodes : '') + '</button>'; }).join('') + '</div></div>');
+    }
+    h.push('<div><label class="label" for="f-prompt">' + t('tweak') + '</label><textarea id="f-prompt" maxlength="1200" placeholder="' + esc(t('tweakPh')) + '">' + esc(f.prompt) + '</textarea></div>');
+    h.push('</div>');
+    return h.join('');
+  }
+
+  function stageText() {
+    var k = { capture: 'stageCapture', upload: 'stageUpload', generate: 'stageGenerate', recover: 'stageRecover', save: 'stageSave' }[S.stage];
+    return k ? t(k) : t('generating');
+  }
+
+  function generateSection() {
+    var c = cost(), bal = totalBalance(), short = c != null && bal != null && bal < c, h = [];
+    if (S.busy && S.stage !== 'save') {
+      h.push('<div class="card stack" role="status" aria-live="polite"><div class="progress"></div><div>' + stageText() + '</div>');
+      h.push('<div class="row between wrap"><span class="muted small">' + t('cancelNote') + '</span><button class="btn sm" data-act="cancelGenerate">' + t('cancelWait') + '</button></div></div>');
+      return h.join('');
+    }
+    if (short) h.push('<div class="banner warn" role="status"><span class="dot"></span><span>' + t('needNodes') + ' (' + c + ' / ' + bal + ' ' + t('nodes') + '). <a class="link" data-act="openWeb">' + t('buyNodes') + '</a></span></div>');
+    h.push('<button class="btn primary block" data-act="generate"' + (short || !c ? ' disabled' : '') + '>' + t('generate') + (c != null ? ' · ' + c + ' ' + t('nodes') : '') + '</button>');
+    return h.join('');
+  }
+
+  function resultSection() {
+    var r = S.result; if (!r) return '';
+    var expired = r.signedAt && (S.now / 1000 - r.signedAt) > 55 * 60;
+    var img = r.previewUrl || r.outputUrl, h = [];
+    h.push('<div class="card stack result"><h2>' + t('result') + '</h2>');
+    if (expired) h.push('<div class="banner warn" role="status"><span class="dot"></span><span>' + t('linkExpired') + '</span></div>');
+    else if (safeImg(img)) h.push('<img id="result-img" data-act="openResult" alt="Render" src="' + esc(img) + '">');
+    if (r.recovered) h.push('<div class="banner warn" role="status"><span class="dot"></span><span>' + t('recovered') + '</span></div>');
+    if (r.fidelityWarning) h.push('<div class="banner warn" role="status"><span class="dot"></span><span>' + t('fidelityWarn') + '</span></div>');
+    var meta = [];
+    if (r.nodesCharged != null) meta.push('<div class="kv"><span>' + t('charged') + '</span><b>' + esc(r.nodesCharged) + ' ' + t('nodes') + '</b></div>');
+    if (r.sourceWidth) meta.push('<div class="kv"><span>' + t('lastCapture') + '</span><b>' + esc(r.sourceWidth) + ' × ' + esc(r.sourceHeight) + '</b></div>');
+    h.push(meta.join(''));
+    h.push('<div class="row wrap">');
+    if (expired) h.push('<button class="btn sm" data-act="restore">' + t('refreshLink') + '</button>');
+    else h.push('<button class="btn sm primary" data-act="save"' + (S.saving ? ' disabled' : '') + '>' + t('save') + '</button>');
+    h.push('<button class="btn sm" data-act="openResult">' + t('openBrowser') + '</button>');
+    if (S.savedPath) h.push('<button class="btn sm" data-act="reveal">' + t('reveal') + '</button>');
+    h.push('</div>');
+    if (S.savedPath) h.push('<div class="muted small" style="word-break:break-all">' + t('saved') + ' ' + esc(S.savedPath) + '</div>');
+    h.push('</div>');
+    return h.join('');
+  }
+
+  function errorBanner() {
+    if (!S.error) return '';
+    return '<div class="banner error" role="alert"><span class="dot"></span><span>' + esc(errorText(S.error)) + '</span><button class="x" data-act="dismissError" aria-label="OK">×</button></div>';
+  }
+
+  function renderDisconnected() {
+    return '<div class="card stack"><div><h2>' + t('connectTitle') + '</h2><p class="muted" style="margin:6px 0 0">' + t('connectBody') + '</p></div>' +
+      '<button class="btn primary block" data-act="connect">' + t('connect') + '</button><button class="btn block" data-act="testCapture">' + t('testCapture') + '</button>' +
+      (S.capture && S.capture.diagnostic ? '<span class="muted small" role="status">' + t('captureOk') + ' ' + esc(S.capture.width) + ' × ' + esc(S.capture.height) + ' px</span>' : '') + '</div>';
+  }
+
+  function remaining(p) { if (!p || !p.expiresAt) return ''; var s = Math.max(0, Math.floor(p.expiresAt - S.now / 1000)); var m = Math.floor(s / 60); return m + ':' + ('0' + (s % 60)).slice(-2); }
+
+  function renderPairing() {
+    var p = S.pairing || {};
+    if (!p.userCode) return '<div class="card stack"><div class="progress"></div><div>' + t('connecting') + '</div><button class="btn block" data-act="cancelConnect">' + t('cancel') + '</button></div>';
+    return '<div class="card stack"><div><h2>' + t('pairTitle') + '</h2><p class="muted" style="margin:6px 0 0">' + t('pairBody') + '</p></div>' +
+      '<div class="code" aria-label="Code">' + esc(p.userCode) + '</div>' +
+      '<div class="row between"><span class="muted small">' + t('pairWaiting') + '</span><span class="muted small">' + t('pairExpires') + ' <span id="pair-timer">' + remaining(p) + '</span></span></div>' +
+      '<div class="progress"></div>' +
+      '<div class="row"><button class="btn sm" data-act="openPairing">' + t('pairReopen') + '</button><button class="btn sm ghost" data-act="cancelConnect">' + t('cancel') + '</button></div></div>';
+  }
+
+  function renderConnected() {
+    var h = [], bal = totalBalance();
+    h.push('<div class="row between"><span class="muted small">' + t('balance') + '</span><span class="row" style="gap:6px"><b style="font-weight:400">' + (bal == null ? '—' : esc(bal)) + ' ' + t('nodes') + '</b>' +
+      '<button class="btn ghost icon-btn" data-act="refresh" aria-label="' + t('refresh') + '" title="' + t('refresh') + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button></span></div>');
+    h.push(errorBanner());
+    if (!S.catalog) { h.push('<div class="card stack"><div class="progress"></div><div class="muted">' + t('loading') + '</div></div>'); return h.join(''); }
+    h.push(viewSection(), projectSection(), engineSection(), generateSection(), resultSection());
+    return h.join('');
+  }
+
+  function render() {
+    var active = document.activeElement, activeId = active && active.id, selStart = null, selEnd = null;
+    if (activeId === 'f-prompt') { selStart = active.selectionStart; selEnd = active.selectionEnd; }
+    var scroll = window.scrollY;
+    var html;
+    if (S.conn === 'pairing') html = errorBanner() + renderPairing();
+    else if (S.conn === 'connected') html = renderConnected();
+    else html = errorBanner() + (S.conn === 'unknown' ? '<div class="card"><div class="progress"></div></div>' : renderDisconnected());
+    main.innerHTML = html;
+    var who = document.getElementById('who'), out = document.getElementById('menu-disconnect');
+    who.hidden = !(S.conn === 'connected' && S.email); who.textContent = S.email;
+    out.hidden = S.conn !== 'connected'; out.title = t('disconnect'); out.setAttribute('aria-label', t('disconnect'));
+    document.getElementById('foot-api').textContent = S.apiBase ? S.apiBase.replace(/^https?:\/\//, '') : '';
+    if (activeId) { var el = document.getElementById(activeId); if (el) { el.focus(); if (selStart != null && el.setSelectionRange) el.setSelectionRange(selStart, selEnd); } }
+    window.scrollTo(0, scroll);
+  }
+
+  function applyTheme(pref) {
+    var light;
+    if (pref === 'light') light = true; else if (pref === 'dark') light = false;
+    else light = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+    document.documentElement.classList.toggle('light', light);
+  }
+
+  // ── Interaction ────────────────────────────────────────────────────────────
+  function formPayload() { var f = S.form; return { engine: f.engine, resolution: f.resolution, projectType: f.projectType, segment: f.segment, environment: f.environment, lighting: f.lighting, background: f.background, sceneElements: f.sceneElements, prompt: f.prompt }; }
+
+  document.addEventListener('click', function (ev) {
+    var el = ev.target.closest ? ev.target.closest('[data-act]') : null; if (!el || el.disabled) return;
+    var act = el.getAttribute('data-act'), v = el.getAttribute('data-v');
+    switch (act) {
+      case 'connect': S.error = null; send('connect'); break;
+      case 'cancelConnect': send('cancelConnect'); break;
+      case 'openPairing': send('openPairing'); break;
+      case 'disconnect': send('disconnect'); break;
+      case 'refresh': S.error = null; send('refresh'); break;
+      case 'activate3D': send('activate3D'); break;
+      case 'testCapture': S.error = null; send('testCapture'); break;
+      case 'projectType': S.form.projectType = v; S.form.segment = ''; S.form.environment = ''; S.form.lighting = ''; S.form.background = ''; S.form.sceneElements = []; normalizeForm(); render(); break;
+      case 'element': { var i = S.form.sceneElements.indexOf(v); if (i >= 0) S.form.sceneElements.splice(i, 1); else S.form.sceneElements.push(v); render(); break; }
+      case 'engine': S.form.engine = v; S.form.resolution = ''; normalizeForm(); render(); break;
+      case 'resolution': S.form.resolution = v; render(); break;
+      case 'generate': S.error = null; send('generate', formPayload()); break;
+      case 'cancelGenerate': send('cancelGenerate'); break;
+      case 'save': S.saving = true; S.error = null; send('save'); render(); break;
+      case 'reveal': send('reveal'); break;
+      case 'openResult': send('openResult'); break;
+      case 'openWeb': send('openWeb'); break;
+      case 'restore': S.error = null; send('restoreRender', { id: S.result && S.result.renderId }); break;
+      case 'dismissError': S.error = null; render(); break;
+    }
+  });
+  document.addEventListener('change', function (ev) {
+    var f = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-field'); if (!f) return;
+    S.form[f] = ev.target.value;
+    if (f === 'segment') { S.form.environment = ''; S.form.lighting = ''; S.form.sceneElements = []; }
+    normalizeForm(); render();
+  });
+  document.addEventListener('input', function (ev) { if (ev.target && ev.target.id === 'f-prompt') S.form.prompt = ev.target.value; });
+
+  // Ticking clock: pairing countdown + signed-link expiry, without re-rendering the whole panel.
+  var expiredShown = false;
+  setInterval(function () {
+    S.now = Date.now();
+    var timer = document.getElementById('pair-timer');
+    if (timer && S.pairing) timer.textContent = remaining(S.pairing);
+    var expired = !!(S.result && S.result.signedAt && (S.now / 1000 - S.result.signedAt) > 55 * 60);
+    if (expired !== expiredShown) { expiredShown = expired; render(); }
+  }, 1000);
+
+  // ── Boot ───────────────────────────────────────────────────────────────────
+  applyTheme(null);
+  if (window.matchMedia) { try { window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function () { if (!S.themePref || S.themePref === 'system') applyTheme(S.themePref); }); } catch (e) {} }
+  render();
+  var tries = 0;
+  (function boot() {
+    if (flush()) { send('ready'); flush(); return; }
+    if (++tries < 100) setTimeout(boot, 100);
+  })();
+  window.__SpaceNodeDebugState = S;
+})();
+</script>
+</body>
+</html>

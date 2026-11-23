@@ -1,0 +1,20 @@
+#include "ResourceIds.hpp"
+
+'STR#' ID_ADDON_INFO "Add-on Name and Description" {
+/* [  1] */		"SpaceNode"
+/* [  2] */		"SpaceNode for Archicad: photorealistic renders of the current 3D view."
+}
+
+'STR#' ID_ADDON_MENU "Strings for the Menu" {
+/* [  1] */		"SpaceNode ^E3 ^ES ^EE ^EI ^ED ^EW ^EL ^10001"
+}
+
+/* --- Dockable browser palette ---------------------------------------------- */
+
+'GDLG' ID_PALETTE Palette | topCaption | close | grow   0   0  400  780  "SpaceNode" {
+/* [  1] */ Browser			0   0  400  780
+}
+
+'DLGH' ID_PALETTE DLG_SpaceNode_Palette {
+1	"SpaceNode"		Browser_0
+}

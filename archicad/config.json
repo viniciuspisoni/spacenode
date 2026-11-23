@@ -1,0 +1,13 @@
+{
+    "addOnName": "SpaceNode",
+    "defaultLanguage": "INT",
+    "languages": [
+        "INT"
+    ],
+    "version": "1.0.0",
+    "copyright": {
+        "name": "SpaceNode",
+        "year": "2026"
+    },
+    "description": "SpaceNode for Archicad: photorealistic renders of your current 3D view."
+}

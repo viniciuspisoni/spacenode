@@ -77,6 +77,8 @@ export function createMemorySupabase(
       const matched = table(name).filter(r => filters.every(f => f(r)))
       if (mode === 'update') {
         matched.forEach(r => Object.assign(r, payload))
+        // update(...).select().maybeSingle() devolve a linha (ou null), como no PostgREST.
+        if (single === 'maybe') return { data: matched[0] ?? null, error: null }
         return { data: matched, error: null }
       }
       const rows = matched.slice(offset, offset + limit)
