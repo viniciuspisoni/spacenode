@@ -77,6 +77,7 @@ export function EditorialPricing({ review = false }: { review?: boolean }) {
   const showBothCycles = ANNUAL_BILLING_ENABLED || review
   const section = useRef<HTMLElement>(null)
   const [billing, setBilling] = useState<BillingCycle>(showBothCycles ? 'annual' : 'monthly')
+  const [expandedPlan, setExpandedPlan] = useState<SellablePlanId | null>(null)
   const [pending, setPending] = useState<SellablePlanId | null>(null)
   const [previewedPlan, setPreviewedPlan] = useState<SellablePlanId | null>(null)
   const [failed, setFailed] = useState<SellablePlanId | null>(null)
@@ -150,29 +151,42 @@ export function EditorialPricing({ review = false }: { review?: boolean }) {
             const detail = planDetails[plan.id]
             const price = billing === 'annual' ? plan.annualMonthlyPrice : plan.monthlyPrice
             const renders = Math.floor(plan.nodes / hdCost)
+            const expanded = expandedPlan === plan.id
             return (
               <article key={plan.id} className={styles.card} data-featured={plan.recommended} aria-labelledby={`plan-${plan.id}`}>
-                <div className={styles.name}>
-                  <h3 id={`plan-${plan.id}`}>{plan.name}</h3>
-                  {plan.recommended && <span>Recomendado</span>}
+                <div className={styles.cardSummary}>
+                  <div className={styles.name}>
+                    <h3 id={`plan-${plan.id}`}>{plan.name}</h3>
+                    {plan.recommended && <span>Recomendado</span>}
+                  </div>
+                  <div className={styles.rate}>
+                    <p className={styles.price}><span>R$</span>{formatBRL(price)}<small>/ mês</small></p>
+                    {billing === 'annual' && <p className={styles.annual}><strong>R$ {formatBRL(plan.annualTotal)}</strong> cobrados ao ano</p>}
+                  </div>
+                  <p className={styles.nodes}>{number.format(plan.nodes)} Nodes por mês</p>
+                  <button type="button" className={styles.disclosure}
+                    aria-label={`${expanded ? 'Recolher' : 'Ver'} detalhes do plano ${plan.name}`}
+                    aria-expanded={expanded} aria-controls={`plan-details-${plan.id}`}
+                    onClick={() => setExpandedPlan(expanded ? null : plan.id)}>
+                    {expanded ? 'Recolher' : 'Ver detalhes'} <span aria-hidden="true">{expanded ? '−' : '+'}</span>
+                  </button>
                 </div>
-                <p className={styles.audience}>{detail.audience}</p>
-                <p className={styles.price}><span>R$</span>{formatBRL(price)}<small>/ mês</small></p>
-                {billing === 'annual' && <p className={styles.annual}>R$ {formatBRL(plan.annualTotal)} cobrados ao ano</p>}
-                <div className={styles.allowance}>
-                  <strong>{number.format(plan.nodes)} Nodes por mês</strong>
-                  <span>Até {number.format(renders)} renders HD com o Pulsar</span>
-                  <small>≈ R$ {formatBRL(price / renders)} por render nesse uso</small>
+                <div className={styles.cardDetails} id={`plan-details-${plan.id}`} data-expanded={expanded}>
+                  <div className={styles.allowance}>
+                    <span>Até {number.format(renders)} renders HD com o Pulsar</span>
+                    <small>≈ R$ {formatBRL(price / renders)} por render nesse uso</small>
+                  </div>
+                  <p className={styles.audience}>{detail.audience}</p>
+                  <ul className={styles.features}>
+                    {detail.features.map(feature => <li key={feature}>{feature}</li>)}
+                  </ul>
+                  <button type="button" disabled={pending !== null} className={styles.checkout}
+                    onClick={() => void selectPlan(plan.id)}>
+                    {pending === plan.id ? 'Abrindo…' : plan.cta}
+                  </button>
+                  {previewedPlan === plan.id && <p role="status" className={styles.reviewNote}>O valor anual está disponível para comparação nesta prévia.</p>}
+                  {failed === plan.id && <p role="alert" className={styles.error}>Não foi possível abrir o pagamento. Tente novamente.</p>}
                 </div>
-                <ul className={styles.features}>
-                  {detail.features.map(feature => <li key={feature}>{feature}</li>)}
-                </ul>
-                <button type="button" disabled={pending !== null} className={styles.checkout}
-                  onClick={() => void selectPlan(plan.id)}>
-                  {pending === plan.id ? 'Abrindo…' : plan.cta}
-                </button>
-                {previewedPlan === plan.id && <p role="status" className={styles.reviewNote}>O valor anual está disponível para comparação nesta prévia.</p>}
-                {failed === plan.id && <p role="alert" className={styles.error}>Não foi possível abrir o pagamento. Tente novamente.</p>}
               </article>
             )
           })}

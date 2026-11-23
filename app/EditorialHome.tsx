@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { Projects } from '@/components/landing/Projects'
 import { EditorialTools } from '@/components/landing/EditorialTools'
 import { EditorialPricing } from '@/components/landing/EditorialPricing'
@@ -24,6 +24,16 @@ function Navigation() {
   const menu = useRef<HTMLDetailsElement>(null)
   const links = navigation.map(item => <a href={item.href} key={item.href}>{item.label}</a>)
 
+  useEffect(() => {
+    function dismiss(event: PointerEvent) {
+      if (menu.current?.open && event.target instanceof Node && !menu.current.contains(event.target)) {
+        menu.current.open = false
+      }
+    }
+    document.addEventListener('pointerdown', dismiss)
+    return () => document.removeEventListener('pointerdown', dismiss)
+  }, [])
+
   return (
     <header className={styles.header} data-cta-position="navigation">
       <div className={styles.navinner}>
@@ -33,7 +43,7 @@ function Navigation() {
         <nav className={styles.desktopNav} aria-label="Navegação principal">{links}</nav>
         <div className={styles.navActions}>
           <a href="/login" className={styles.login}>Entrar</a>
-          <a className={styles.navButton} href={signup}>Começar agora</a>
+          <a className={styles.navButton} href={signup}>Testar grátis</a>
           <details className={styles.mobileMenu} ref={menu} onKeyDown={event => {
             if (event.key === 'Escape' && menu.current) {
               menu.current.open = false
@@ -41,7 +51,10 @@ function Navigation() {
             }
           }}>
             <summary aria-label="Menu de navegação"><span /><span /></summary>
-            <nav aria-label="Navegação móvel" onClick={() => { if (menu.current) menu.current.open = false }}>{links}</nav>
+            <nav aria-label="Navegação móvel" onClick={() => { if (menu.current) menu.current.open = false }}>
+              {links}
+              <a className={styles.menuLogin} href="/login">Entrar na minha conta</a>
+            </nav>
           </details>
         </div>
       </div>
@@ -88,18 +101,18 @@ export default function EditorialHome({ review }: { review: boolean }) {
       <Navigation />
       <LpViewPing slug={landing} />
       <main id="conteudo">
-        <section className={styles.hero} data-cta-position="hero">
-          <div>
+        <div className={styles.opening}>
+          <section className={styles.hero} data-cta-position="hero" aria-labelledby="titulo-lp">
             <p className={styles.discipline}>Visualização arquitetônica com IA</p>
-            <h1>Seu projeto,<br />em outra luz.</h1>
-          </div>
-          <div className={styles.heroLead}>
-            <p>Transforme uma vista do seu modelo em render. Explore luz e materiais, refine os detalhes e leve o ambiente em imagem ou vídeo para a reunião com o cliente.</p>
-            <a className={styles.primary} href={signup}>Testar no meu projeto</a>
-            <small>{FREE_SIGNUP_NODES} Nodes de teste · sem cartão</small>
-          </div>
-        </section>
-        <Projects review={review} />
+            <h1 id="titulo-lp">Do modelo<br /> ao render.</h1>
+            <div className={styles.heroLead}>
+              <p>Explore luz e materiais a partir de uma vista do seu modelo 3D. Apresente as opções ao cliente em imagem ou vídeo.</p>
+              <a className={styles.primary} href={signup}>Testar no meu projeto</a>
+              <small>{FREE_SIGNUP_NODES} Nodes de teste · sem cartão</small>
+            </div>
+          </section>
+          <Projects review={review} />
+        </div>
         <EditorialTools />
         <EditorialPricing review={review} />
         <section className={styles.faq} id="faq" aria-labelledby="faq-title">

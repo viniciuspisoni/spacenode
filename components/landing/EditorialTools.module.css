@@ -6,38 +6,26 @@
   color: #191b18;
 }
 
-.heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 32px;
-  margin-bottom: clamp(26px, 3.3vw, 44px);
-}
-
-.heading h2,
+.heading,
 .caption h3 {
   margin: 0;
   color: inherit;
   font-weight: 500;
 }
 
-.heading h2 {
+.heading {
+  margin-bottom: clamp(26px, 3.3vw, 44px);
   font-size: clamp(36px, 4.5vw, 64px);
   line-height: 1.02;
   letter-spacing: -0.056em;
 }
 
-.heading p,
 .caption p,
 .plugin {
   margin: 0;
   color: #565953;
   font-size: 15px;
   line-height: 1.55;
-}
-
-.heading p {
-  max-width: 37ch;
 }
 
 .examples {
@@ -137,14 +125,6 @@
 }
 
 @media (max-width: 760px) {
-  .heading {
-    display: block;
-  }
-
-  .heading p {
-    margin-top: 14px;
-  }
-
   .examples {
     grid-template-columns: 1fr;
     gap: 32px;

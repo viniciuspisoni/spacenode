@@ -16,10 +16,7 @@ export function EditorialTools() {
 
   return (
     <section id="produto" aria-labelledby="editorial-tools-title" className={styles.section}>
-      <div className={styles.heading}>
-        <h2 id="editorial-tools-title">O que dá para fazer</h2>
-        <p>Edite um acabamento, explore a luz da cena ou transforme um render em vídeo para apresentar ao cliente.</p>
-      </div>
+      <h2 id="editorial-tools-title" className={styles.heading}>Luz e materiais</h2>
 
       <div className={styles.examples}>
         <figure>
