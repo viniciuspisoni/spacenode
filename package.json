@@ -20,6 +20,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
     "@fal-ai/client": "^1.9.5",
     "@google/genai": "^2.4.0",
     "@stripe/stripe-js": "^9.2.0",

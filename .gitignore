@@ -52,6 +52,7 @@ tests/fidelity/bench/inputs/
 tests/fidelity/bench/last-run.json
 tests/fidelity/bench/runs.json
 tests/fidelity/bench/outputs/
+tests/fidelity/bench/v3-out/
 
 # Scratch do CLI do Supabase (cache de checagem de versão). Aparece em
 # qualquer clone onde alguém rode `supabase`/`npx supabase` — é do CLI, não

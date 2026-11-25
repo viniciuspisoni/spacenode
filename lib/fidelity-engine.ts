@@ -15,13 +15,13 @@ import type { BriefingArquitetonico } from '@/lib/prompts'
 
 const VISION_TIMEOUT_MS = 20_000
 
-const SYSTEM_PROMPT =
+export const SYSTEM_PROMPT =
   'Você é um arquiteto sênior especializado em análise técnica de imagens de projeto ' +
   '(renders, fotos de maquete, fotos de obra, esquemas 3D). Sua tarefa é descrever a ' +
   'arquitetura visível de forma objetiva, sem opinar. Responda SEMPRE e APENAS com um ' +
   'objeto JSON válido — sem texto antes ou depois, sem markdown, sem ```json fences.'
 
-const USER_PROMPT =
+export const USER_PROMPT =
   'Analise a imagem e devolva um JSON com EXATAMENTE estas chaves:\n' +
   '{\n' +
   '  "tipo_projeto": string,           // ex: "fachada residencial contemporânea, sobrado isolado"\n' +
@@ -78,7 +78,7 @@ function fallbackBriefing(): BriefingArquitetonico {
   }
 }
 
-function parseBriefing(raw: string): BriefingArquitetonico {
+export function parseBriefing(raw: string): BriefingArquitetonico {
   // remove possível ```json fence se o modelo desobedecer
   const cleaned = raw
     .trim()
