@@ -1,0 +1,41 @@
+{
+  "version": "v3-2026-11-25",
+  "note": "Prints da bancada SpaceNode 3.0. Todos ja publicados no site/marketing (public/, marketing/renders/antes). Projetos de cliente nao publicados nunca entram aqui: vao direto para inputs/, que esta no .gitignore.",
+  "cases": [
+    { "id": "int-banheiro",          "type": "interior", "source": "marketing/renders/antes/banheiro.jpg",            "checks": ["box de vidro e espelho", "metais pretos", "marmore", "iluminacao embutida"] },
+    { "id": "int-coworking",         "type": "interior", "source": "marketing/renders/antes/coworking.jpg",           "checks": ["forro curvo", "contagem de cadeiras e mesas", "pele de vidro"] },
+    { "id": "int-industrial",        "type": "interior", "source": "marketing/renders/antes/industrial.jpg",          "checks": ["mezanino e guarda-corpo", "escada", "piso de madeira", "entrada 4000 px"] },
+    { "id": "int-living-cortina",    "type": "interior", "source": "marketing/renders/antes/living.jpg",              "checks": ["cortina fechada", "painel terracota", "lustre de bolhas", "quadro e TV"] },
+    { "id": "int-painel-tv-ripado",  "type": "interior", "source": "public/cliente-bruna-sala-painel-tv-183-base.jpg", "checks": ["painel ripado de madeira", "trilho com spots", "plantas"] },
+    { "id": "int-cozinha-ladrilho",  "type": "interior", "source": "public/proj-cozinha-ceramica-base.jpg",           "checks": ["padrao do ladrilho hidraulico", "objetos pequenos nas prateleiras", "geladeira"] },
+    { "id": "int-cozinha-ilha",      "type": "interior", "source": "public/proj-cozinha-ilha-base.jpg",               "checks": ["marcenaria lisa", "ilha", "cooktop e forno", "TV embutida"] },
+    { "id": "int-corredor-piso",     "type": "interior", "source": "public/proj-entrada-corredor-base.jpg",           "checks": ["piso paginado", "painel ripado branco", "cristaleira de vidro"] },
+    { "id": "int-home-office",       "type": "interior", "source": "public/proj-home-office-base.jpg",                "checks": ["camera grande-angular proxima", "ar-condicionado", "janela"] },
+    { "id": "int-estante-livros",    "type": "interior", "source": "public/proj-living-estante-base.jpg",             "checks": ["estante cheia (nao inventar/remover objetos)", "violoes", "quadros"] },
+    { "id": "int-living-jantar",     "type": "interior", "source": "public/proj-living-jantar-base.jpg",              "checks": ["parede curva terracota", "sofa azul", "trilho de spots"] },
+    { "id": "int-sala-estar",        "type": "interior", "source": "public/proj-sala-estar-base.jpg",                 "checks": ["proporcao quase 4:3", "pendentes e arandela", "sofa bordo"] },
+    { "id": "int-sala-jantar",       "type": "interior", "source": "public/proj-sala-jantar-base.jpg",                "checks": ["painel madeira escura", "cristaleira de vidro", "cortina"] },
+    { "id": "int-porta-pivotante",   "type": "interior", "source": "public/projetos-aprovados/100-base.webp",         "checks": ["porta pivotante", "cortina", "sofa em L"] },
+    { "id": "int-cozinha-banquetas", "type": "interior", "source": "public/projetos-aprovados/174-base.webp",         "checks": ["contagem de banquetas", "revestimento verde", "bancada"] },
+    { "id": "int-nicho-poltronas",   "type": "interior", "source": "public/projetos-aprovados/25-base.webp",           "checks": ["nicho iluminado", "poltronas azuis", "luminarias de teto"] },
+    { "id": "int-quarto",            "type": "interior", "source": "public/projetos-aprovados/345-base.webp",         "checks": ["guarda-roupa", "cabeceira azul", "ar-condicionado"] },
+    { "id": "int-cozinha-corredor",  "type": "interior", "source": "public/projetos-aprovados/94-base.webp",          "checks": ["ladrilho", "carrinho", "relogio", "porta de madeira"] },
+    { "id": "ext-casa-contemporanea","type": "exterior", "source": "marketing/renders/antes/casa.jpg",                "checks": ["dois volumes brancos", "esquadrias", "carro", "vegetacao e terreno"] },
+    { "id": "ext-comercial-tijolo",  "type": "exterior", "source": "marketing/renders/antes/comercial.jpg",           "checks": ["tijolo", "esquadrias finas", "escada metalica", "letreiros e texto"] },
+    { "id": "ext-croqui-linhas",     "type": "exterior", "source": "public/demo-sketch.jpg",                          "checks": ["desenho so de linhas", "nao inventar volumes", "materiais coerentes"] },
+    { "id": "ext-fachada-fundo-preto","type": "exterior","source": "public/projetos-aprovados/13-base.webp",          "checks": ["fundo preto sem ceu", "pedra", "vegetacao frontal"] },
+    { "id": "ext-quintal-lareira",   "type": "exterior", "source": "public/projetos-aprovados/142-base.webp",         "checks": ["fogo de lareira", "arvores grandes", "deck e pisos"] },
+    { "id": "ext-foto-casa",         "type": "exterior", "source": "public/gallery-casa-before.jpg",                  "checks": ["entrada ja fotografica: preservar detalhe", "mesma casa de ext-casa-contemporanea"] },
+    { "id": "ext-foto-comercial",    "type": "exterior", "source": "public/gallery-comercial-before.jpg",             "checks": ["entrada ja fotografica: preservar detalhe", "mesmo predio de ext-comercial-tijolo"] }
+  ],
+  "missing": [
+    "5 fachadas (residencial, comercial, predio alto, esquina, muro e portao)",
+    "2 vistas noturnas com luminarias acesas",
+    "2 prints em retrato (vertical)",
+    "2 prints de Archicad ou Revit",
+    "1 vista aerea ou implantacao",
+    "1 paisagismo com piscina",
+    "1 loja ou interior corporativo com logotipo",
+    "1 croqui a mao"
+  ]
+}
