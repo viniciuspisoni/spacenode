@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Brandmark } from '@/components/brand'
+import { CAPTCHA_FAILED_MESSAGE, isCaptchaError } from '@/lib/auth/turnstile'
+import { TurnstileWidget, type TurnstileHandle } from '@/components/auth/TurnstileWidget'
 
 // Fluxo "esqueci minha senha". Também serve pra usuários Google que querem
 // definir uma senha pela primeira vez — o email de recovery do Supabase chega
@@ -16,6 +18,7 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
   const [sent,    setSent]    = useState(false)
+  const captchaRef = useRef<TurnstileHandle>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -23,12 +26,18 @@ export default function ForgotPasswordPage() {
     setLoading(true)
 
     const supabase = createClient()
+    // Token do Turnstile (uso único): renovado depois de cada tentativa.
+    const captchaToken = await captchaRef.current?.getToken()
+    captchaRef.current?.reset()
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      captchaToken,
       redirectTo: `${window.location.origin}/auth/callback?next=/update-password`,
     })
 
     if (error) {
-      setError('Não foi possível enviar o email. Verifique o endereço e tente novamente.')
+      setError(isCaptchaError(error)
+        ? CAPTCHA_FAILED_MESSAGE
+        : 'Não foi possível enviar o email. Verifique o endereço e tente novamente.')
       setLoading(false)
     } else {
       setSent(true)
@@ -111,6 +120,8 @@ export default function ForgotPasswordPage() {
               onFocus={e => { e.currentTarget.style.borderColor = 'var(--color-border-focus)' }}
               onBlur={e  => { e.currentTarget.style.borderColor = 'var(--color-input-border)'  }}
             />
+
+            <TurnstileWidget ref={captchaRef} gap={10} />
 
             <button
               type="submit"

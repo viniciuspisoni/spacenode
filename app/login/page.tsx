@@ -8,6 +8,8 @@ import { Brandmark } from '@/components/brand'
 import { internalNextPath } from '@/lib/auth/safe-next-path'
 import { LOGIN_NEXT_COOKIE, LOGIN_NEXT_MAX_AGE } from '@/lib/auth/login-next-cookie'
 import { weakPasswordMessage } from '@/lib/auth/password-errors'
+import { CAPTCHA_FAILED_MESSAGE, isCaptchaError } from '@/lib/auth/turnstile'
+import { TurnstileWidget, type TurnstileHandle } from '@/components/auth/TurnstileWidget'
 import {
   ANON_COOKIE,
   intentFromSearchParams,
@@ -149,6 +151,7 @@ function LoginForm() {
   const [success,       setSuccess]       = useState<string | null>(null)
 
   const { resolvedTheme } = useTheme()
+  const captchaRef = useRef<TurnstileHandle>(null)
   const googleBtnRef = useRef<HTMLDivElement>(null)
   const nonceFetchRef = useRef<Promise<string> | null>(null)
   const googleReadyRef = useRef(false)
@@ -257,16 +260,23 @@ function LoginForm() {
     setLoading(true)
 
     const supabase = createClient()
+    // Token do Turnstile (uso único): renovado depois de cada tentativa.
+    const captchaToken = await captchaRef.current?.getToken()
+    captchaRef.current?.reset()
 
     if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) { setError(translateError(error.message)); setLoading(false) }
+      const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } })
+      if (error) {
+        setError(isCaptchaError(error) ? CAPTCHA_FAILED_MESSAGE : translateError(error.message))
+        setLoading(false)
+      }
       else        { router.push(nextPath) }
     } else {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          captchaToken,
           emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
           // Origem e destino gravados na conta: o link de confirmação costuma
           // abrir em OUTRO navegador (app de e-mail), onde estes cookies não
@@ -284,7 +294,11 @@ function LoginForm() {
       if (error) {
         // Senha vazada/fraca recusada pelo Supabase vem com motivo próprio —
         // a mensagem genérica fazia a pessoa repetir a mesma senha.
-        setError(weakPasswordMessage(error) ?? translateError(error.message))
+        setError(
+          isCaptchaError(error)
+            ? CAPTCHA_FAILED_MESSAGE
+            : weakPasswordMessage(error) ?? translateError(error.message),
+        )
         setLoading(false)
       } else if (data.session) {
         // Sessão na hora = confirmação de e-mail desligada: o cadastro acabou
@@ -414,6 +428,8 @@ function LoginForm() {
               onFocus={e  => { e.currentTarget.style.borderColor = 'var(--color-border-focus)' }}
               onBlur={e   => { e.currentTarget.style.borderColor = 'var(--color-input-border)'  }}
             />
+
+            <TurnstileWidget ref={captchaRef} gap={10} />
 
             <button
               type="submit"
