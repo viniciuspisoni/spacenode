@@ -52,8 +52,8 @@ describe('rotas e combinações', () => {
 
   it('estimateCost espelha as tabelas reais', () => {
     expect(estimateCost('renderizar', { engine: 'vega', resolution: '4k' })).toBe(getNodesCost('vega', '4k'))
-    expect(estimateCost('animar', { model: 'fal-ai/veo3.1/image-to-video', duration: '6' }))
-      .toBe(getNodeCost('fal-ai/veo3.1/image-to-video', '6'))
+    expect(estimateCost('animar', { model: 'fal-ai/veo3.1/image-to-video', duration: '8' }))
+      .toBe(getNodeCost('fal-ai/veo3.1/image-to-video', '8'))
     expect(estimateCost('renderizar', { engine: 'vega', resolution: 'hd' })).toBeNull() // combinação inexistente
     expect(estimateCost('finalizar', {})).toBeNull()
   })

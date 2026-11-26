@@ -7,20 +7,35 @@ import { fal } from '@fal-ai/client'
 import type { VideoAdapter, VideoGenerationRequest, VideoGenerationResult } from './types'
 
 const KLING_25 = 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video'
+const KLING_LITE = 'fal-ai/kling-video/v2.5-turbo/standard/image-to-video'
+const KLING_O3 = 'fal-ai/kling-video/o3/pro/image-to-video'
 const VEO_31   = 'fal-ai/veo3.1/image-to-video'
 const SEEDANCE = 'bytedance/seedance-2.0/image-to-video'
+const SEEDANCE_15 = 'fal-ai/bytedance/seedance/v1.5/pro/image-to-video'
 
-function buildFalInput(req: VideoGenerationRequest): Record<string, unknown> {
+export function buildFalInput(req: VideoGenerationRequest): Record<string, unknown> {
   const { modelId, imageUrl, prompt, negativePrompt, duration, aspectRatio, resolution, generateAudio } = req
 
-  if (modelId === KLING_25) {
+  if (modelId === KLING_25 || modelId === KLING_LITE) {
     return {
       image_url:       imageUrl,
       prompt,
       duration,
       negative_prompt: negativePrompt,
       cfg_scale:       0.75,
+      ...(modelId === KLING_25 && req.endImageUrl ? { tail_image_url: req.endImageUrl } : {}),
     }
+  }
+
+  if (modelId === KLING_O3) {
+    return { image_url: imageUrl, prompt, duration, generate_audio: false,
+      ...(req.endImageUrl ? { end_image_url: req.endImageUrl } : {}) }
+  }
+
+  if (modelId === SEEDANCE_15) {
+    return { image_url: imageUrl, prompt, duration,
+      resolution: resolution ?? '720p', aspect_ratio: aspectRatio ?? 'auto', generate_audio: false,
+      ...(req.endImageUrl ? { end_image_url: req.endImageUrl } : {}) }
   }
 
   if (modelId === VEO_31) {

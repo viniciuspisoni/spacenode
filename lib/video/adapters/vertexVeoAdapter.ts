@@ -9,8 +9,7 @@
 //   Credencial (UMA das duas formas — mesma convenção do vertex-imagen):
 //     GOOGLE_VERTEX_CREDENTIALS_JSON — JSON inteiro da service account numa env
 //     GOOGLE_APPLICATION_CREDENTIALS — caminho do arquivo da SA (ADC, p/ local)
-//   VERTEX_VEO_MODEL_ID             — override do modelo
-//                                     (default veo-3.1-generate-001, GA 2026-06)
+//   O modelo é resolvido pelo catálogo: Standard, Fast ou Lite.
 //
 // Fluxo: generateVideos (long-running) → poll getVideosOperation a cada 10s →
 // bytes base64 → re-hospeda no Supabase Storage (o Vertex não devolve CDN
@@ -26,6 +25,16 @@ import { falAdapter } from './falAdapter'
 import type { VideoAdapter, VideoGenerationRequest, VideoGenerationResult } from './types'
 
 export const DEFAULT_VERTEX_VEO_MODEL = 'veo-3.1-generate-001'
+const VERTEX_VARIANTS: Record<string, string> = {
+  'vertex/veo-3.1-lite-generate-001': 'veo-3.1-lite-generate-001',
+  'vertex/veo-3.1-fast-generate-001': 'veo-3.1-fast-generate-001',
+}
+
+export function vertexModelFor(modelId: string): string {
+  if (Object.hasOwn(VERTEX_VARIANTS, modelId)) return VERTEX_VARIANTS[modelId]
+  if (modelId === 'fal-ai/veo3.1/image-to-video') return DEFAULT_VERTEX_VEO_MODEL
+  throw new Error('Modelo não suportado pelo Vertex Veo.')
+}
 
 // Smoke 2026-07-07: 4s@720p levou 213s no Vertex — bem mais lento que o fal.
 // 260s deixa ~35s de folga dentro do maxDuration de 300s da rota (submit +
@@ -124,7 +133,7 @@ export const vertexVeoAdapter: VideoAdapter = {
   isAvailable: () => enabled() && hasCredentials(),
 
   async generate(req: VideoGenerationRequest): Promise<VideoGenerationResult> {
-    const model = process.env.VERTEX_VEO_MODEL_ID?.trim() || DEFAULT_VERTEX_VEO_MODEL
+    const model = vertexModelFor(req.modelId)
 
     // ── Fase de submit — qualquer falha aqui cai pro fal (nada foi cobrado
     //    no Vertex ainda; latência de fallback é pequena) ───────────────────
@@ -151,8 +160,10 @@ export const vertexVeoAdapter: VideoAdapter = {
         },
       })
     } catch (err) {
-      console.error('[vertexVeo] submit falhou — fallback pro fal:', (err as Error).message)
-      if (falAdapter.isAvailable()) {
+      // Apenas o mesmo modelo Standard pode usar a rota equivalente na FAL.
+      // Lite/Fast nunca viram outro modelo silenciosamente.
+      console.error('[vertexVeo] submit falhou:', (err as Error).message)
+      if (req.modelId === 'fal-ai/veo3.1/image-to-video' && falAdapter.isAvailable()) {
         const viaFal = await falAdapter.generate(req)
         return { ...viaFal, provider: 'fal' }
       }

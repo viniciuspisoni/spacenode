@@ -121,7 +121,7 @@ type Action =
   | { type: 'resetResult' }
   | { type: 'setCredits';         credits: number }
 
-function initialState(credits: number): AnimateState {
+export function initialAnimateState(credits: number): AnimateState {
   const preset   = VIDEO_TYPE_PRESETS[DEFAULT_VIDEO_TYPE]
   const defaults = resolvePresetDefaults(preset)
   return {
@@ -138,7 +138,7 @@ function initialState(credits: number): AnimateState {
     duration:        defaults.duration,
     aspectRatio:     defaults.aspectRatio,
     sceneType:       'living',
-    motionChoice:    defaults.motionId,
+    motionChoice:    'dolly-in-soft',
     intensity:       defaults.intensity,
     fidelityMode:    defaults.fidelityMode,
     atmosphere:      '',
@@ -152,7 +152,7 @@ function initialState(credits: number): AnimateState {
   }
 }
 
-function reducer(state: AnimateState, action: Action): AnimateState {
+export function animateReducer(state: AnimateState, action: Action): AnimateState {
   switch (action.type) {
     case 'setImage':
       return {
@@ -213,21 +213,27 @@ function reducer(state: AnimateState, action: Action): AnimateState {
 
     case 'setModel': {
       const m = requireVideoModel(action.modelId)
+      if (!m.isAvailable) return state
       // Se a duração/formato atuais não são suportados pelo novo motor, ajusta.
       const duration = m.supportedDurations.includes(state.duration)
         ? state.duration
-        : m.supportedDurations[m.supportedDurations.length - 1]
+        : m.supportedDurations[0]
       const aspectRatio = m.supportedAspectRatios.includes(state.aspectRatio)
         ? state.aspectRatio
         : 'auto'
-      return { ...state, modelId: action.modelId, duration, aspectRatio }
+      return {
+        ...state, modelId: action.modelId, duration, aspectRatio,
+        ...(m.supportedInputs.includes('imageEnd') ? {} : { endImageFile: null, endImagePreview: null }),
+      }
     }
 
     case 'setDuration':
-      return { ...state, duration: action.duration }
+      return requireVideoModel(state.modelId).supportedDurations.includes(action.duration)
+        ? { ...state, duration: action.duration } : state
 
     case 'setAspectRatio':
-      return { ...state, aspectRatio: action.aspectRatio }
+      return requireVideoModel(state.modelId).supportedAspectRatios.includes(action.aspectRatio)
+        ? { ...state, aspectRatio: action.aspectRatio } : state
 
     case 'setScene':
       return { ...state, sceneType: action.sceneType }
@@ -268,7 +274,7 @@ function reducer(state: AnimateState, action: Action): AnimateState {
       return { ...state, elapsed: state.elapsed + 1 }
 
     case 'reset':
-      return initialState(state.credits)
+      return initialAnimateState(state.credits)
 
     case 'resetResult':
       return { ...state, status: state.imageFile ? 'ready' : 'idle', result: null, error: null }
@@ -302,7 +308,7 @@ export function resolveMotion(state: AnimateState): CameraMotion {
 // ── Hook principal ──────────────────────────────────────────────────────────
 
 export function useAnimateState(initialCredits: number) {
-  const [state, dispatch] = useReducer(reducer, initialCredits, initialState)
+  const [state, dispatch] = useReducer(animateReducer, initialCredits, initialAnimateState)
 
   // Tick de elapsed enquanto gerando
   const elapsedInterval = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -323,6 +329,7 @@ export function useAnimateState(initialCredits: number) {
     catch { return 0 }
   })()
   const canGenerate =
+    model.isAvailable && nodeCost > 0 &&
     !!state.imageFile &&
     state.credits >= nodeCost &&
     state.status !== 'generating' &&
