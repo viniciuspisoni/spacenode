@@ -42,7 +42,7 @@ import {
 import { seedreamRegionTag } from '@/lib/ai/fal/seedreamEdit'
 import type { CostObserver } from '@/lib/costs/instrument'
 import { normalizeSourceImage } from '@/lib/storage/normalize-image'
-import { evaluateEditSemantics } from '@/lib/edit-v2/semantic-gate'
+import { evaluateEditSemantics } from './semantic-gate'
 import type { EditIntentV2 } from '@/lib/edit-v2/types'
 import { SEEDREAM_LOW_TIER_MAX_PIXELS } from '@/lib/ai/seedream-size'
 import { EditV3InputError, assertSafeImageUrl } from '@/lib/edit-v3/ssrf'
@@ -423,10 +423,9 @@ export async function runEditV4(input: EditV4RunInput): Promise<EditV4RunResult>
   const resultUrl = await input.uploadAsset(storageBuf, 'result')
   const outMeta = await sharp(storageBuf).metadata()
 
-  // ── 9. Gate semântico (best-effort) ────────────────────────────────────────
-  // Com seleção é ADVISORY: o recompose já garantiu os pixels de fora, e o aviso
-  // cobre o dentro (material errado, artefato). Sem seleção ele REJEITA — é a
-  // única proteção fina do modo. Depende do Gemini; indisponível → `skipped`.
+  // ── 9. Gate semântico obrigatório ────────────────────────────────────────
+  // A máscara protege pixels externos; não comprova alvo, material ou geometria.
+  // Reprovação, resposta incompleta ou indisponibilidade impedem entrega e cobrança.
   let semantic: EditV4RunResult['semantic'] = null
   if (input.semanticGate && input.instructionEn.trim()) {
     const verdict = await evaluateEditSemantics({
@@ -439,13 +438,16 @@ export async function runEditV4(input: EditV4RunInput): Promise<EditV4RunResult>
       timeoutMs: 20_000,
     })
     semantic = { pass: verdict.pass, reasons: verdict.reasons, skipped: verdict.skipped }
-    if (!hasMask && !verdict.pass && !verdict.skipped) {
+    if (!verdict.pass || verdict.skipped) {
+      if (verdict.reasons.length === 0) reasons.push('semantic_review_incomplete')
       for (const r of verdict.reasons) reasons.push(`semantic_${r}`)
     }
+  } else {
+    reasons.push('semantic_review_unavailable')
   }
 
   return {
-    resultUrl,
+    resultUrl: reasons.length > 0 ? null : resultUrl,
     rejected: reasons.length > 0,
     rejectReasons: reasons,
     provider: engineOut.provider,
