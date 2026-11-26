@@ -57,3 +57,6 @@ tests/fidelity/bench/outputs/
 # qualquer clone onde alguém rode `supabase`/`npx supabase` — é do CLI, não
 # do projeto. As migrations, essas sim, continuam versionadas.
 supabase/.temp/
+
+# Resultados e revisões locais do piloto Animar.
+/benchmark-output/
