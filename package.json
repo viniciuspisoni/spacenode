@@ -36,6 +36,7 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
     "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
